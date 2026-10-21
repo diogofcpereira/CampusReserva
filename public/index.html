@@ -12,14 +12,26 @@
         content="CampusReserva — plataforma de reserva de espaços e equipamentos do ISLA Gaia."
     >
 
+    <link rel="icon" type="image/svg+xml" href="/assets/isla-gaia-icon.svg">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Work+Sans:wght@600;700;800&display=swap"
+    >
+
     <style>
+        /* Paleta inspirada na identidade visual do ISLA Gaia (islagaia.pt) */
         :root {
-            --primary: #2445a5;
-            --primary-dark: #183580;
-            --text: #17233f;
-            --muted: #74809a;
-            --border: #e3e8f2;
-            --background: #f4f6fc;
+            --primary: #a50624;
+            --primary-dark: #7e041b;
+            --primary-soft: #fbeef0;
+            --charcoal: #292929;
+            --text: #292929;
+            --muted: #7a7a7a;
+            --border: #e9e9e9;
+            --background: #f5f5f5;
             --white: #ffffff;
         }
 
@@ -30,7 +42,7 @@
         body {
             margin: 0;
             min-height: 100vh;
-            font-family: Arial, Helvetica, sans-serif;
+            font-family: 'Roboto', Arial, Helvetica, sans-serif;
             color: var(--text);
             background: var(--background);
         }
@@ -59,10 +71,10 @@
             background:
                 radial-gradient(
                     circle at 85% 80%,
-                    rgba(117, 153, 255, 0.32),
-                    transparent 35%
+                    rgba(222, 62, 62, 0.30),
+                    transparent 38%
                 ),
-                linear-gradient(145deg, #15295f, #2445a5 65%, #4166c9);
+                linear-gradient(150deg, #1c1c1c, #4a0512 45%, #a50624 100%);
         }
 
         .welcome-panel::before,
@@ -105,14 +117,21 @@
             width: 48px;
             height: 48px;
             flex-shrink: 0;
+            padding: 7px;
             border-radius: 15px;
             background: var(--white);
-            color: var(--primary);
-            font-size: 25px;
-            font-weight: 800;
+        }
+
+        .brand-icon img,
+        .login-symbol img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }
 
         .brand-name {
+            font-family: 'Work Sans', 'Roboto', Arial, sans-serif;
             font-size: 21px;
             font-weight: 800;
             letter-spacing: -0.5px;
@@ -144,6 +163,7 @@
 
         .welcome-content h1 {
             margin: 25px 0 20px;
+            font-family: 'Work Sans', 'Roboto', Arial, sans-serif;
             font-size: clamp(36px, 4vw, 57px);
             line-height: 1.08;
             letter-spacing: -2px;
@@ -202,8 +222,9 @@
             padding: 42px;
             border: 1px solid var(--border);
             border-radius: 22px;
+            border-top: 4px solid var(--primary);
             background: var(--white);
-            box-shadow: 0 18px 60px rgba(27, 43, 83, 0.08);
+            box-shadow: 0 18px 60px rgba(41, 41, 41, 0.08);
         }
 
         .login-symbol {
@@ -212,14 +233,14 @@
             width: 54px;
             height: 54px;
             margin-bottom: 26px;
+            padding: 9px;
             border-radius: 16px;
-            background: #edf1ff;
-            color: var(--primary);
-            font-size: 25px;
+            background: var(--primary-soft);
         }
 
         .login-card h2 {
             margin: 0 0 10px;
+            font-family: 'Work Sans', 'Roboto', Arial, sans-serif;
             font-size: 30px;
             letter-spacing: -1px;
         }
@@ -243,7 +264,7 @@
         }
 
         .form-field label {
-            color: #35415c;
+            color: var(--charcoal);
             font-size: 13px;
             font-weight: 700;
         }
@@ -256,21 +277,21 @@
             width: 100%;
             min-height: 49px;
             padding: 13px 14px;
-            border: 1px solid #dce2ef;
+            border: 1px solid #dcdcdc;
             border-radius: 11px;
             outline: none;
-            background: #fbfcff;
+            background: #fafafa;
             color: var(--text);
             transition: border-color 0.2s, box-shadow 0.2s;
         }
 
         .input-wrap input::placeholder {
-            color: #a0a9bc;
+            color: #a0a0a0;
         }
 
         .input-wrap input:focus {
             border-color: var(--primary);
-            box-shadow: 0 0 0 4px rgba(36, 69, 165, 0.10);
+            box-shadow: 0 0 0 4px rgba(165, 6, 36, 0.12);
         }
 
         .login-button {
@@ -292,7 +313,7 @@
         }
 
         .login-button:focus-visible {
-            outline: 3px solid #9eb3ff;
+            outline: 3px solid #e8a3b0;
             outline-offset: 3px;
         }
 
@@ -325,7 +346,7 @@
         }
 
         .login-note strong {
-            color: #495570;
+            color: var(--charcoal);
         }
 
         /* Adaptação a telemóveis */
@@ -387,7 +408,9 @@
 
         <section class="welcome-panel">
             <div class="brand">
-                <div class="brand-icon" aria-hidden="true">C</div>
+                <div class="brand-icon">
+                    <img src="/assets/isla-gaia-icon.svg" alt="Logótipo ISLA Gaia">
+                </div>
 
                 <div>
                     <div class="brand-name">CampusReserva</div>
@@ -431,7 +454,9 @@
 
         <section class="login-panel">
             <div class="login-card">
-                <div class="login-symbol" aria-hidden="true">↗</div>
+                <div class="login-symbol" aria-hidden="true">
+                    <img src="/assets/isla-gaia-icon.svg" alt="">
+                </div>
 
                 <h2>Bem-vindo de volta</h2>
 
