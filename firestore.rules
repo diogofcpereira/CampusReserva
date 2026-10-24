@@ -1,6 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
     function signedIn() {
       return request.auth != null;
     }
@@ -21,112 +22,344 @@ service cloud.firestore {
       ];
     }
 
+    // Exige uma data real no formato AAAA-MM-DD e rejeita texto livre.
+    function validDate(value) {
+      return value is string
+        && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && int(value.split('-')[0]) >= 1
+        && (
+          (value.split('-')[1] in ['01', '03', '05', '07', '08', '10', '12']
+            && int(value.split('-')[2]) >= 1
+            && int(value.split('-')[2]) <= 31)
+          ||
+          (value.split('-')[1] in ['04', '06', '09', '11']
+            && int(value.split('-')[2]) >= 1
+            && int(value.split('-')[2]) <= 30)
+          ||
+          (value.split('-')[1] == '02'
+            && int(value.split('-')[2]) >= 1
+            && int(value.split('-')[2]) <= 28)
+          ||
+          (value.split('-')[1] == '02'
+            && int(value.split('-')[2]) == 29
+            && (int(value.split('-')[0]) % 400 == 0
+              || (int(value.split('-')[0]) % 4 == 0
+                && int(value.split('-')[0]) % 100 != 0)))
+        );
+    }
+
+    function validDuration(durationMinutes) {
+      return durationMinutes in [30, 60, 90, 120, 150, 180];
+    }
+
+    function nextTime(time) {
+      return time == '08:00' ? '08:30' :
+        time == '08:30' ? '09:00' :
+        time == '09:00' ? '09:30' :
+        time == '09:30' ? '10:00' :
+        time == '10:00' ? '10:30' :
+        time == '10:30' ? '11:00' :
+        time == '11:00' ? '11:30' :
+        time == '11:30' ? '12:00' :
+        time == '12:00' ? '12:30' :
+        time == '12:30' ? '13:00' :
+        time == '13:00' ? '13:30' :
+        time == '13:30' ? '14:00' :
+        time == '14:00' ? '14:30' :
+        time == '14:30' ? '15:00' :
+        time == '15:00' ? '15:30' :
+        time == '15:30' ? '16:00' :
+        time == '16:00' ? '16:30' :
+        time == '16:30' ? '17:00' :
+        time == '17:00' ? '17:30' :
+        time == '17:30' ? '18:00' :
+        time == '18:00' ? '18:30' :
+        time == '18:30' ? '19:00' :
+        time == '19:00' ? '19:30' :
+        time == '19:30' ? '20:00' :
+        time == '20:00' ? '20:30' :
+        time == '20:30' ? '21:00' :
+        time == '21:00' ? '21:30' :
+        time == '21:30' ? '22:00' : '';
+    }
+
+    function endTimeFor(time, durationMinutes) {
+      return durationMinutes == 30 ? nextTime(time) :
+        durationMinutes == 60 ? nextTime(nextTime(time)) :
+        durationMinutes == 90 ? nextTime(nextTime(nextTime(time))) :
+        durationMinutes == 120 ? nextTime(nextTime(nextTime(nextTime(time)))) :
+        durationMinutes == 150 ? nextTime(nextTime(nextTime(nextTime(nextTime(time))))) :
+        durationMinutes == 180 ? nextTime(nextTime(nextTime(nextTime(nextTime(nextTime(time)))))) : '';
+    }
+
+    function slotDocumentId(resourceId, date, time, resourceType, unitNumber) {
+      return resourceType == 'equipamento'
+        ? resourceId + '_' + date + '_' + time + '_unit_' + unitNumber
+        : resourceId + '_' + date + '_' + time;
+    }
+
+    function validCapacity(data) {
+      return data.type == 'equipamento'
+        ? data.keys().hasAny(['capacity'])
+          && data.capacity is int
+          && data.capacity >= 1
+          && data.capacity <= 1000
+        : (
+          !data.keys().hasAny(['capacity'])
+          || data.capacity == null
+          || (data.capacity is int && data.capacity >= 1 && data.capacity <= 1000)
+        );
+    }
+
+    // Recursos antigos criados manualmente podem não ter createdAt.
+    // Nesse caso, uma edição não tem de inventar nem comparar um campo inexistente.
+    function createdAtUnchanged() {
+      return (
+        !resource.data.keys().hasAny(['createdAt'])
+        && !request.resource.data.keys().hasAny(['createdAt'])
+      ) || (
+        resource.data.keys().hasAny(['createdAt'])
+        && request.resource.data.keys().hasAny(['createdAt'])
+        && request.resource.data.createdAt == resource.data.createdAt
+      );
+    }
+
+    // Um equipamento antigo sem capacity é tratado como uma única unidade.
+    // Se capacity existir, tem obrigatoriamente de ser um inteiro positivo.
+    function validReservationUnit(resourceData, reservationData) {
+      return (
+        reservationData.resourceType == 'sala'
+        && reservationData.unitNumber == 1
+      ) || (
+        reservationData.resourceType == 'equipamento'
+        && (
+          (!resourceData.keys().hasAny(['capacity']) && reservationData.unitNumber == 1)
+          || (
+            resourceData.keys().hasAny(['capacity'])
+            && resourceData.capacity is int
+            && resourceData.capacity >= 1
+            && reservationData.unitNumber <= resourceData.capacity
+          )
+        )
+      );
+    }
+
+    function reservationHasSlot(data, slotId) {
+      return data.keys().hasAny(['slotIds'])
+        ? data.slotIds is list && data.slotIds.hasAny([slotId])
+        : data.slotId == slotId;
+    }
+
+    function timeAtOffset(time, offset) {
+      return offset == 0 ? time :
+        offset == 1 ? nextTime(time) :
+        offset == 2 ? nextTime(nextTime(time)) :
+        offset == 3 ? nextTime(nextTime(nextTime(time))) :
+        offset == 4 ? nextTime(nextTime(nextTime(nextTime(time)))) :
+        offset == 5 ? nextTime(nextTime(nextTime(nextTime(nextTime(time))))) : '';
+    }
+
+    function lockMatchesReservation(data, reservationId, index, expectedTime) {
+      let lockId = data.slotIds[index];
+      let lockPath = /databases/$(database)/documents/reservationSlots/$(lockId);
+      return lockId == slotDocumentId(
+          data.resourceId, data.date, expectedTime,
+          data.resourceType, data.unitNumber
+        )
+        && existsAfter(lockPath)
+        && getAfter(lockPath).data.reservationId == reservationId
+        && getAfter(lockPath).data.resourceId == data.resourceId
+        && getAfter(lockPath).data.date == data.date
+        && getAfter(lockPath).data.startTime == expectedTime
+        && getAfter(lockPath).data.unitNumber == data.unitNumber;
+    }
+
+    function reservationLocksMatch(data, reservationId) {
+      return data.slotIds is list
+        && data.slotIds.size() >= 1
+        && data.slotIds.size() <= 6
+        && data.slotId == data.slotIds[0]
+        && (
+          (data.durationMinutes == 30 && data.slotIds.size() == 1
+            && lockMatchesReservation(data, reservationId, 0, timeAtOffset(data.startTime, 0)))
+          ||
+          (data.durationMinutes == 60 && data.slotIds.size() == 2
+            && lockMatchesReservation(data, reservationId, 0, timeAtOffset(data.startTime, 0))
+            && lockMatchesReservation(data, reservationId, 1, timeAtOffset(data.startTime, 1)))
+          ||
+          (data.durationMinutes == 90 && data.slotIds.size() == 3
+            && lockMatchesReservation(data, reservationId, 0, timeAtOffset(data.startTime, 0))
+            && lockMatchesReservation(data, reservationId, 1, timeAtOffset(data.startTime, 1))
+            && lockMatchesReservation(data, reservationId, 2, timeAtOffset(data.startTime, 2)))
+          ||
+          (data.durationMinutes == 120 && data.slotIds.size() == 4
+            && lockMatchesReservation(data, reservationId, 0, timeAtOffset(data.startTime, 0))
+            && lockMatchesReservation(data, reservationId, 1, timeAtOffset(data.startTime, 1))
+            && lockMatchesReservation(data, reservationId, 2, timeAtOffset(data.startTime, 2))
+            && lockMatchesReservation(data, reservationId, 3, timeAtOffset(data.startTime, 3)))
+          ||
+          (data.durationMinutes == 150 && data.slotIds.size() == 5
+            && lockMatchesReservation(data, reservationId, 0, timeAtOffset(data.startTime, 0))
+            && lockMatchesReservation(data, reservationId, 1, timeAtOffset(data.startTime, 1))
+            && lockMatchesReservation(data, reservationId, 2, timeAtOffset(data.startTime, 2))
+            && lockMatchesReservation(data, reservationId, 3, timeAtOffset(data.startTime, 3))
+            && lockMatchesReservation(data, reservationId, 4, timeAtOffset(data.startTime, 4)))
+          ||
+          (data.durationMinutes == 180 && data.slotIds.size() == 6
+            && lockMatchesReservation(data, reservationId, 0, timeAtOffset(data.startTime, 0))
+            && lockMatchesReservation(data, reservationId, 1, timeAtOffset(data.startTime, 1))
+            && lockMatchesReservation(data, reservationId, 2, timeAtOffset(data.startTime, 2))
+            && lockMatchesReservation(data, reservationId, 3, timeAtOffset(data.startTime, 3))
+            && lockMatchesReservation(data, reservationId, 4, timeAtOffset(data.startTime, 4))
+            && lockMatchesReservation(data, reservationId, 5, timeAtOffset(data.startTime, 5)))
+        );
+    }
+
+    function reservationLocksRemoved(data) {
+      return data.keys().hasAny(['slotIds'])
+        ? data.slotIds is list
+          && data.slotIds.size() >= 1
+          && data.slotIds.size() <= 6
+          && !existsAfter(/databases/$(database)/documents/reservationSlots/$(data.slotIds[0]))
+          && (data.slotIds.size() < 2 || !existsAfter(/databases/$(database)/documents/reservationSlots/$(data.slotIds[1])))
+          && (data.slotIds.size() < 3 || !existsAfter(/databases/$(database)/documents/reservationSlots/$(data.slotIds[2])))
+          && (data.slotIds.size() < 4 || !existsAfter(/databases/$(database)/documents/reservationSlots/$(data.slotIds[3])))
+          && (data.slotIds.size() < 5 || !existsAfter(/databases/$(database)/documents/reservationSlots/$(data.slotIds[4])))
+          && (data.slotIds.size() < 6 || !existsAfter(/databases/$(database)/documents/reservationSlots/$(data.slotIds[5])))
+        : !existsAfter(/databases/$(database)/documents/reservationSlots/$(data.slotId));
+    }
+
     match /users/{userId} {
-      // Utilizador vê o próprio perfil. Gestores podem consultar todos os perfis.
       allow read: if signedIn() && (request.auth.uid == userId || isManager());
 
-      // O primeiro perfil só pode ser criado como utilizador normal.
+      // Um perfil criado a partir do browser tem de corresponder à conta autenticada.
       allow create: if signedIn()
         && request.auth.uid == userId
         && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email is string
+        && request.resource.data.email == request.auth.token.email
         && request.resource.data.role == 'utilizador'
         && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'createdAt', 'updatedAt']);
 
-      // Gestores podem alterar o papel de OUTROS perfis, nunca o próprio através da aplicação.
-      // Utilizadores normais só podem atualizar o nome visível, não o papel, UID ou email.
       allow update: if (
           isManager()
           && request.auth.uid != userId
           && request.resource.data.role in ['utilizador', 'gestor']
-          && request.resource.data.uid == resource.data.uid
-          && request.resource.data.email == resource.data.email
+          && request.resource.data.get('uid', userId) == resource.data.get('uid', userId)
+          && request.resource.data.get('email', '') == resource.data.get('email', '')
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'updatedAt'])
         ) || (
           signedIn()
           && request.auth.uid == userId
           && request.resource.data.role == resource.data.role
-          && request.resource.data.uid == resource.data.uid
-          && request.resource.data.email == resource.data.email
+          && request.resource.data.get('uid', userId) == resource.data.get('uid', userId)
+          && request.resource.data.get('email', '') == resource.data.get('email', '')
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'updatedAt'])
         );
 
-      // A remoção de contas de autenticação não é feita pela aplicação web.
       allow delete: if false;
     }
 
     match /resources/{resourceId} {
-      // Utilizadores só podem ler recursos ativos. Gestores também veem os desativados.
       allow read: if signedIn() && (resource.data.active == true || isManager());
+
       allow create: if isManager()
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 90
         && request.resource.data.type in ['sala', 'equipamento']
         && request.resource.data.location is string
         && request.resource.data.active is bool
+        && validCapacity(request.resource.data)
         && request.resource.data.keys().hasOnly(['name', 'type', 'location', 'capacity', 'description', 'active', 'createdAt', 'updatedAt']);
+
       allow update: if isManager()
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 90
         && request.resource.data.type in ['sala', 'equipamento']
         && request.resource.data.location is string
         && request.resource.data.active is bool
-        && request.resource.data.createdAt == resource.data.createdAt
+        && validCapacity(request.resource.data)
+        && createdAtUnchanged()
         && request.resource.data.keys().hasOnly(['name', 'type', 'location', 'capacity', 'description', 'active', 'createdAt', 'updatedAt']);
-      // Os recursos são desativados em vez de apagados, para preservar o histórico das reservas.
+
       allow delete: if false;
     }
 
     match /reservations/{reservationId} {
-      // Utilizadores consultam apenas as suas reservas. Gestores podem consultar todas.
       allow read: if signedIn() && (resource.data.userId == request.auth.uid || isManager());
 
-      // Cada reserva criada pelo utilizador tem de criar um bloqueio correspondente na mesma transação.
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.status == 'ativa'
         && request.resource.data.resourceId is string
-        && request.resource.data.date is string
+        && validDate(request.resource.data.date)
         && validStartTime(request.resource.data.startTime)
-        && request.resource.data.slotId == request.resource.data.resourceId + '_' + request.resource.data.date + '_' + request.resource.data.startTime
+        && validDuration(request.resource.data.durationMinutes)
+        && request.resource.data.endTime == endTimeFor(request.resource.data.startTime, request.resource.data.durationMinutes)
+        && request.resource.data.resourceType in ['sala', 'equipamento']
+        && request.resource.data.resourceName is string
+        && request.resource.data.unitNumber is int
+        && request.resource.data.unitNumber >= 1
         && exists(/databases/$(database)/documents/resources/$(request.resource.data.resourceId))
         && get(/databases/$(database)/documents/resources/$(request.resource.data.resourceId)).data.active == true
-        && existsAfter(/databases/$(database)/documents/reservationSlots/$(request.resource.data.slotId))
-        && getAfter(/databases/$(database)/documents/reservationSlots/$(request.resource.data.slotId)).data.reservationId == reservationId
-        && getAfter(/databases/$(database)/documents/reservationSlots/$(request.resource.data.slotId)).data.resourceId == request.resource.data.resourceId
-        && getAfter(/databases/$(database)/documents/reservationSlots/$(request.resource.data.slotId)).data.date == request.resource.data.date
-        && getAfter(/databases/$(database)/documents/reservationSlots/$(request.resource.data.slotId)).data.startTime == request.resource.data.startTime
-        && request.resource.data.keys().hasOnly(['userId', 'resourceId', 'resourceName', 'resourceType', 'date', 'startTime', 'slotId', 'status', 'createdAt']);
+        && get(/databases/$(database)/documents/resources/$(request.resource.data.resourceId)).data.name == request.resource.data.resourceName
+        && get(/databases/$(database)/documents/resources/$(request.resource.data.resourceId)).data.type == request.resource.data.resourceType
+        && validReservationUnit(
+          get(/databases/$(database)/documents/resources/$(request.resource.data.resourceId)).data,
+          request.resource.data
+        )
+        && reservationLocksMatch(request.resource.data, reservationId)
+        && request.resource.data.keys().hasOnly(['userId', 'resourceId', 'resourceName', 'resourceType', 'date', 'startTime', 'endTime', 'durationMinutes', 'unitNumber', 'slotId', 'slotIds', 'status', 'createdAt']);
 
-      // O dono pode cancelar as suas reservas; um gestor pode cancelar qualquer reserva.
-      // Em ambos os casos, o bloqueio do horário tem de ser removido na mesma transação.
+      // Cancelar só altera estado/data e elimina todos os bloqueios na mesma transação.
       allow update: if signedIn()
         && (resource.data.userId == request.auth.uid || isManager())
         && resource.data.status == 'ativa'
         && request.resource.data.status == 'cancelada'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt'])
-        && !existsAfter(/databases/$(database)/documents/reservationSlots/$(resource.data.slotId));
+        && reservationLocksRemoved(resource.data);
+
       allow delete: if false;
     }
 
     match /reservationSlots/{slotId} {
-      // Contém apenas metadados de disponibilidade, sem nome/email do utilizador.
       allow read: if signedIn();
+
       allow create: if signedIn()
+        && request.resource.data.resourceId is string
+        && validDate(request.resource.data.date)
         && validStartTime(request.resource.data.startTime)
-        && slotId == request.resource.data.resourceId + '_' + request.resource.data.date + '_' + request.resource.data.startTime
-        && request.resource.data.keys().hasOnly(['reservationId', 'resourceId', 'date', 'startTime'])
+        && request.resource.data.unitNumber is int
+        && request.resource.data.unitNumber >= 1
+        && request.resource.data.keys().hasOnly(['reservationId', 'resourceId', 'date', 'startTime', 'unitNumber'])
         && existsAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId))
         && getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.userId == request.auth.uid
         && getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.status == 'ativa'
-        && getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.slotId == slotId
         && getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.resourceId == request.resource.data.resourceId
         && getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.date == request.resource.data.date
-        && getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.startTime == request.resource.data.startTime;
+        && getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.unitNumber == request.resource.data.unitNumber
+        && getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.resourceType == get(/databases/$(database)/documents/resources/$(request.resource.data.resourceId)).data.type
+        && reservationHasSlot(getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data, slotId)
+        && slotId == slotDocumentId(
+          request.resource.data.resourceId,
+          request.resource.data.date,
+          request.resource.data.startTime,
+          getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.resourceType,
+          request.resource.data.unitNumber
+        );
+
       allow update: if false;
+
       allow delete: if signedIn()
         && existsAfter(/databases/$(database)/documents/reservations/$(resource.data.reservationId))
         && getAfter(/databases/$(database)/documents/reservations/$(resource.data.reservationId)).data.status == 'cancelada'
-        && (getAfter(/databases/$(database)/documents/reservations/$(resource.data.reservationId)).data.userId == request.auth.uid || isManager());
+        && (getAfter(/databases/$(database)/documents/reservations/$(resource.data.reservationId)).data.userId == request.auth.uid || isManager())
+        && reservationHasSlot(
+          getAfter(/databases/$(database)/documents/reservations/$(resource.data.reservationId)).data,
+          slotId
+        );
     }
   }
 }

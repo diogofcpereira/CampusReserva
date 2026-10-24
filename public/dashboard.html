@@ -7,8 +7,6 @@
   <title>CampusReserva | Área reservada</title>
   <link rel="stylesheet" href="./css/dashboard.css">
   <script type="module">
-    // Importar a aplicação de forma dinâmica permite mostrar um erro visível
-    // se dashboard.js ou algum dos seus módulos (por exemplo firebase.js) falhar.
     import("./js/dashboard.js").catch((error) => {
       console.error("Não foi possível iniciar o CampusReserva:", error);
       const panel = document.getElementById("loadingPanel");
@@ -32,10 +30,9 @@
       <p class="nav-label" id="navLabel">MENU PRINCIPAL</p>
       <nav class="main-nav" aria-label="Navegação principal">
         <button class="nav-link active" type="button" data-view="home"><span class="nav-icon" aria-hidden="true">⌂</span><span id="homeNavText">Visão geral</span></button>
-
         <button class="nav-link user-only" type="button" data-view="resources" data-role="utilizador"><span class="nav-icon" aria-hidden="true">▦</span><span>Salas e equipamentos</span></button>
         <button class="nav-link user-only" type="button" data-view="reservations" data-role="utilizador"><span class="nav-icon" aria-hidden="true">✓</span><span>As minhas reservas</span></button>
-
+        <button class="nav-link manager-only" type="button" data-view="resources" data-role="gestor" hidden><span class="nav-icon" aria-hidden="true">▦</span><span>Reservar recursos</span></button>
         <button class="nav-link manager-only" type="button" data-view="manager-reservations" data-role="gestor" hidden><span class="nav-icon" aria-hidden="true">▤</span><span>Gerir reservas</span></button>
         <button class="nav-link manager-only" type="button" data-view="manage-resources" data-role="gestor" hidden><span class="nav-icon" aria-hidden="true">▦</span><span>Salas e equipamentos</span></button>
         <button class="nav-link manager-only" type="button" data-view="manage-users" data-role="gestor" hidden><span class="nav-icon" aria-hidden="true">♙</span><span>Gestão de utilizadores</span></button>
@@ -59,25 +56,23 @@
       <div class="loading-panel" id="loadingPanel"><span class="spinner"></span><p>A carregar a tua área pessoal...</p></div>
 
       <div id="appContent" hidden>
-        <!-- Dashboard exclusivo do utilizador comum -->
         <section class="page-view active" id="view-home" aria-label="Dashboard">
           <div id="userHome" data-role="utilizador">
             <div class="welcome-row"><div><span class="eyebrow">ÁREA PESSOAL</span><h2 id="homeWelcome">Olá!</h2><p>Consulta os espaços disponíveis e organiza as tuas próximas atividades no ISLA Gaia.</p></div><button class="button button-primary" type="button" data-go-view="resources">＋ Fazer uma reserva</button></div>
             <div class="stats-grid">
               <article class="stat-card"><div class="stat-icon stat-icon-rose">▤</div><div><strong id="userStatReservations">0</strong><p>Minhas reservas futuras</p></div></article>
               <article class="stat-card"><div class="stat-icon stat-icon-sand">▦</div><div><strong id="userStatRooms">0</strong><p>Salas disponíveis</p></div></article>
-              <article class="stat-card"><div class="stat-icon stat-icon-grey">▣</div><div><strong id="userStatEquipment">0</strong><p>Equipamentos disponíveis</p></div></article>
+              <article class="stat-card"><div class="stat-icon stat-icon-grey">▣</div><div><strong id="userStatEquipment">0</strong><p>Unidades de equipamento livres</p></div></article>
             </div>
             <section class="resource-home-section">
-              <div class="section-heading"><div><h2>Salas e equipamentos</h2><p>Seleciona um recurso para consultar os horários de 30 minutos e fazer uma reserva.</p></div><button class="text-button" type="button" data-go-view="resources">Ver catálogo completo →</button></div>
+              <div class="section-heading"><div><h2>Salas e equipamentos</h2><p>Seleciona um recurso, escolhe a duração e consulta os horários disponíveis.</p></div><button class="text-button" type="button" data-go-view="resources">Ver catálogo completo →</button></div>
               <div id="homeResourceGrid" class="resource-grid"></div>
             </section>
             <section class="panel upcoming-panel"><div class="panel-heading"><div><h2>Próximas reservas</h2><p>Os teus horários agendados.</p></div><button class="text-button" type="button" data-go-view="reservations">Ver todas →</button></div><div id="userHomeReservations" class="compact-list"></div></section>
           </div>
 
-          <!-- Dashboard separado do gestor: visão global e atalhos administrativos -->
           <div id="managerHome" data-role="gestor" hidden>
-            <div class="welcome-row"><div><span class="eyebrow">ADMINISTRAÇÃO DO CAMPUS</span><h2>Painel de gestão</h2><p>Gere recursos, reservas e permissões de acesso do CampusReserva.</p></div><span class="admin-label">Acesso de gestor</span></div>
+            <div class="welcome-row"><div><span class="eyebrow">ADMINISTRAÇÃO DO CAMPUS</span><h2>Painel de gestão</h2><p>Gere recursos, reservas e permissões de acesso do CampusReserva.</p></div><button class="button button-primary" type="button" data-go-view="resources">＋ Reservar sala/equipamento</button></div>
             <div class="stats-grid stats-grid-four">
               <article class="stat-card"><div class="stat-icon stat-icon-rose">▦</div><div><strong id="managerStatResources">0</strong><p>Recursos ativos</p></div></article>
               <article class="stat-card"><div class="stat-icon stat-icon-sand">▤</div><div><strong id="managerStatReservations">0</strong><p>Reservas ativas</p></div></article>
@@ -93,9 +88,8 @@
           </div>
         </section>
 
-        <!-- Área do utilizador: catálogo e popup para consultar/reservar horários -->
-        <section class="page-view" id="view-resources" data-role="utilizador" aria-labelledby="resourcesTitle" hidden>
-          <div class="section-heading"><div><span class="eyebrow">CATÁLOGO DO CAMPUS</span><h2 id="resourcesTitle">Salas e equipamentos</h2><p>Escolhe um recurso para consultar os horários. Os períodos ocupados aparecem a vermelho.</p></div></div>
+        <section class="page-view" id="view-resources" aria-labelledby="resourcesTitle" hidden>
+          <div class="section-heading"><div><span class="eyebrow">CATÁLOGO DO CAMPUS</span><h2 id="resourcesTitle">Salas e equipamentos</h2><p>Escolhe a duração da reserva. Os intervalos ocupados aparecem a vermelho.</p></div></div>
           <div class="filter-row" role="group" aria-label="Filtrar recursos">
             <button class="filter-button active" type="button" data-filter="todos">Todos</button>
             <button class="filter-button" type="button" data-filter="sala">Salas</button>
@@ -109,7 +103,6 @@
           <div class="panel reservations-panel"><div class="reservation-tabs"><span class="reservation-tab active">Histórico e próximas</span><span class="reservations-count" id="userReservationsCount">0 reservas</span></div><div id="userReservationsList" class="reservations-list"></div></div>
         </section>
 
-        <!-- Área exclusiva do gestor -->
         <section class="page-view" id="view-manager-reservations" data-role="gestor" aria-labelledby="managerReservationsTitle" hidden>
           <div class="section-heading"><div><span class="eyebrow">ADMINISTRAÇÃO</span><h2 id="managerReservationsTitle">Gestão de reservas</h2><p>Consulta as reservas de todos os utilizadores e cancela uma reserva quando necessário.</p></div></div>
           <div class="filter-row" role="group" aria-label="Filtrar reservas por estado">
@@ -128,8 +121,8 @@
                 <input type="hidden" id="editingResourceId" value="">
                 <div class="form-field"><label for="resourceName">Nome</label><input type="text" id="resourceName" maxlength="90" placeholder="Ex.: Sala de aula" required></div>
                 <div class="form-field"><label for="resourceType">Tipo</label><select id="resourceType" required><option value="sala">Sala</option><option value="equipamento">Equipamento eletrónico</option></select></div>
-                <div class="form-field"><label for="resourceLocation">Localização</label><input type="text" id="resourceLocation" maxlength="100" placeholder="Ex.: Piso 1" required></div>
-                <div class="form-field"><label for="resourceCapacity">Capacidade/unidades (opcional)</label><input type="number" id="resourceCapacity" min="1" max="1000" placeholder="Número de pessoas/unidades"></div>
+                <div class="form-field" id="resourceLocationField"><label for="resourceLocation" id="resourceLocationLabel">Piso / localização</label><input type="text" id="resourceLocation" maxlength="100" placeholder="Ex.: Piso 1" required></div>
+                <div class="form-field"><label for="resourceCapacity" id="resourceCapacityLabel">Capacidade (lugares, opcional)</label><input type="number" id="resourceCapacity" min="1" max="1000" step="1" placeholder="Número de lugares"></div>
                 <div class="form-field"><label for="resourceDescription">Descrição</label><textarea id="resourceDescription" rows="3" maxlength="500" placeholder="Características e notas úteis"></textarea></div>
                 <label class="check-field"><input type="checkbox" id="resourceActive" checked><span>Disponível para novas reservas</span></label>
                 <p class="form-error" id="resourceError" role="alert" hidden></p>
@@ -151,17 +144,26 @@
     </main>
   </div>
 
-  <!-- Modal de horários: os intervalos ocupados permanecem visíveis a vermelho, mas não são reserváveis. -->
   <dialog class="resource-dialog" id="resourceDialog" aria-labelledby="dialogResourceName">
     <div class="dialog-header"><div class="dialog-resource-heading"><span class="resource-symbol" id="dialogResourceSymbol" aria-hidden="true">▦</span><div><span class="eyebrow">CONSULTAR DISPONIBILIDADE</span><h2 id="dialogResourceName">Recurso</h2><p id="dialogResourceMeta">Localização</p></div></div><button class="dialog-close" type="button" id="closeResourceDialog" aria-label="Fechar">×</button></div>
     <div class="dialog-content">
       <div class="dialog-date-field"><label for="dialogDate">Data da reserva</label><input type="date" id="dialogDate" required></div>
-      <div class="slot-legend"><span><i class="legend-dot legend-free"></i>Disponível</span><span><i class="legend-dot legend-occupied"></i>Ocupado</span><span><i class="legend-dot legend-past"></i>Passado</span></div>
+      <div class="dialog-date-field"><label for="dialogDuration">Duração da reserva</label><select id="dialogDuration" required><option value="30" selected>30 minutos</option><option value="60">1 hora</option><option value="90">1 hora e 30 minutos</option><option value="120">2 horas</option><option value="150">2 horas e 30 minutos</option><option value="180">3 horas</option></select></div>
+      <div class="slot-legend"><span><i class="legend-dot legend-free"></i>Disponível</span><span><i class="legend-dot legend-occupied"></i>Ocupado</span><span><i class="legend-dot legend-past"></i>Passado / fora do horário</span></div>
       <p class="availability-message" id="dialogAvailabilityMessage" role="status" aria-live="polite">A consultar horários...</p>
-      <div class="slot-grid" id="slotGrid" aria-label="Horários de 30 minutos"></div>
+      <div class="slot-grid" id="slotGrid" aria-label="Horários de início em intervalos de 30 minutos"></div>
       <p class="dialog-error" id="dialogError" role="alert" hidden></p>
       <div class="dialog-selection"><div><small>HORÁRIO SELECIONADO</small><strong id="selectedSlotLabel">Nenhum horário selecionado</strong></div><button class="button button-primary" type="button" id="confirmReservationBtn" disabled>Confirmar reserva</button></div>
-      <p class="dialog-footnote">Cada reserva dura 30 minutos. Um horário ocupado não pode ser reservado por outra pessoa.</p>
+      <p class="dialog-footnote">Cada reserva pode durar entre 30 minutos e 3 horas. Os horários são bloqueados em intervalos de 30 minutos.</p>
+    </div>
+  </dialog>
+
+  <dialog class="resource-dialog cancel-reservation-dialog" id="cancelReservationDialog" aria-labelledby="cancelReservationTitle">
+    <div class="dialog-header"><div><span class="eyebrow">GESTÃO DE RESERVAS</span><h2 id="cancelReservationTitle">Cancelar reserva?</h2><p id="cancelReservationIntro">Confirma os detalhes antes de cancelar.</p></div><button class="dialog-close" type="button" id="closeCancelReservationDialog" aria-label="Fechar">×</button></div>
+    <div class="dialog-content">
+      <div id="cancelReservationSummary" class="cancel-reservation-summary"></div>
+      <p class="dialog-footnote">Ao cancelar, todos os intervalos reservados voltarão a ficar disponíveis.</p>
+      <div class="cancel-reservation-actions"><button class="button button-secondary" type="button" id="keepReservationBtn">Manter reserva</button><button class="button button-danger" type="button" id="confirmCancelReservationBtn">Cancelar reserva</button></div>
     </div>
   </dialog>
 </body>

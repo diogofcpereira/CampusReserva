@@ -276,3 +276,107 @@ button:disabled { cursor: not-allowed; opacity: .52; transform: none !important;
   .dialog-selection .button { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+#dialogDuration,
+#dialogDate {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+#dialogDuration:focus,
+#dialogDate:focus {
+  border-color: var(--rose);
+  box-shadow: 0 0 0 3px rgba(186, 145, 131, .16);
+  outline: none;
+}
+
+/* Campo de localização escondido para equipamentos eletrónicos. */
+#resourceLocationField[hidden] {
+  display: none !important;
+}
+
+/* Confirmação de cancelamento com detalhes da reserva. */
+.cancel-reservation-dialog {
+  width: min(560px, calc(100vw - 28px));
+  max-width: 560px;
+}
+
+.cancel-reservation-summary {
+  display: grid;
+  gap: 0;
+  margin: 0 0 16px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.cancel-detail {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cancel-detail:last-child {
+  border-bottom: 0;
+}
+
+.cancel-detail span {
+  flex: 0 0 110px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.cancel-detail strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.cancel-reservation-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.button-danger {
+  border-color: var(--bad);
+  background: var(--bad);
+  color: #fff;
+}
+
+.button-danger:hover {
+  border-color: #901c27;
+  background: #901c27;
+}
+
+@media (max-width: 650px) {
+  .cancel-detail {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .cancel-detail span {
+    flex-basis: 90px;
+  }
+
+  .cancel-reservation-actions {
+    flex-direction: column-reverse;
+  }
+
+  .cancel-reservation-actions .button {
+    width: 100%;
+  }
+}
