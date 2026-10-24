@@ -20,7 +20,7 @@ const firebaseConfig = {
   projectId: "campusreservage",
   storageBucket: "campusreservage.firebasestorage.app",
   messagingSenderId: "834601060186",
-  appId: "1:601060186:web:877fe843714f16b8f85563"
+  appId: "1:834601060186:web:877fe843714f16b8f85563"
 };
 
 // Em desenvolvimento (aplicação aberta em localhost) usa os emuladores locais;
