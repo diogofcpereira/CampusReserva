@@ -1,23 +1,10 @@
-    import {
-        initializeApp
-    } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js";
+import { auth } from "./firebase.js";
 
-    import {
-        getAuth,
-        signInWithEmailAndPassword
-    } from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
+import {
+    signInWithEmailAndPassword
+} from "https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js";
 
-    const firebaseConfig = {
-        apiKey: "AIzaSyCHeWE5G8S95G0XzNRlussdIn9jt0q8i7o",
-        authDomain: "campusreservage.firebaseapp.com",
-        projectId: "campusreservage",
-        storageBucket: "campusreservage.firebasestorage.app",
-        messagingSenderId: "834601060186",
-        appId: "1:601060186:web:877fe843714f16b8f85563"
-    };
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
 
     const loginForm = document.getElementById("loginForm");
     const loginBtn = document.getElementById("loginBtn");

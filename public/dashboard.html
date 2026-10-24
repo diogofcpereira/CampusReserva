@@ -5,13 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="CampusReserva — reserva de salas e equipamentos do ISLA Gaia.">
   <title>CampusReserva | Área reservada</title>
-  <link rel="stylesheet" href="/css/dashboard.css">
-  <script type="module" src="/js/dashboard.js"></script>
+  <link rel="stylesheet" href="./css/dashboard.css">
+  <script type="module">
+    // Importar a aplicação de forma dinâmica permite mostrar um erro visível
+    // se dashboard.js ou algum dos seus módulos (por exemplo firebase.js) falhar.
+    import("./js/dashboard.js").catch((error) => {
+      console.error("Não foi possível iniciar o CampusReserva:", error);
+      const panel = document.getElementById("loadingPanel");
+      if (panel) {
+        panel.innerHTML = `
+          <strong>Não foi possível iniciar a dashboard.</strong>
+          <p>Verifica se os ficheiros <code>js/dashboard.js</code> e <code>js/firebase.js</code> existem dentro da pasta <code>public</code>.</p>
+          <p>Abre as ferramentas do programador (F12) e consulta a consola para veres o erro detalhado.</p>`;
+      }
+    });
+  </script>
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
-      <a class="brand" href="/dashboard.html" aria-label="CampusReserva — início">
+      <a class="brand" href="./dashboard.html" aria-label="CampusReserva — início">
         <span class="brand-mark" aria-hidden="true">I</span>
         <span class="brand-copy"><strong>ISLA Gaia</strong><small>Reserva de espaços</small></span>
       </a>

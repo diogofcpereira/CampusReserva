@@ -40,7 +40,7 @@ $("#todayLabel").textContent = new Intl.DateTimeFormat("pt-PT", {
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
-    window.location.replace("/index.html");
+    window.location.replace("./index.html");
     return;
   }
 
@@ -59,34 +59,53 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function loadProfile() {
-  const profileRef = doc(db, "users", currentUser.uid);
-  let profileSnapshot = await getDoc(profileRef);
-  if (!profileSnapshot.exists()) {
-    await setDoc(profileRef, {
-      uid: currentUser.uid,
-      email: currentUser.email ?? "",
-      displayName: currentUser.displayName ?? "",
-      role: "utilizador",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-    profileSnapshot = await getDoc(profileRef);
-  }
+    const profileRef = doc(db, "users", currentUser.uid);
 
-  currentProfile = profileSnapshot.data() ?? { role: "utilizador" };
-  const emailName = (currentUser.email ?? "utilizador").split("@")[0].replace(/[._-]+/g, " ");
-  const displayName = (currentProfile.displayName || emailName || "Utilizador").trim();
-  const firstName = displayName.split(/\s+/)[0];
-  const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toUpperCase() || "CR";
-  const manager = currentProfile.role === "gestor";
+    // Consultar o perfil, sem criar documentos no Firestore.
+    const profileSnapshot = await getDoc(profileRef);
 
-  $("#homeWelcome").textContent = `Olá, ${firstName}!`;
-  $("#sidebarUserName").textContent = displayName;
-  $("#sidebarUserRole").textContent = manager ? "Gestor" : "Utilizador";
-  $("#sidebarInitials").textContent = initials;
-  $("#headerRole").textContent = manager ? "Gestor" : "Utilizador";
-  $("#homeNavText").textContent = manager ? "Painel de gestão" : "Visão geral";
-  $("#navLabel").textContent = manager ? "ADMINISTRAÇÃO" : "MENU PRINCIPAL";
+    const emailName = (currentUser.email ?? "utilizador")
+        .split("@")[0]
+        .replace(/[._-]+/g, " ");
+
+    // Se não existir perfil, considerar utilizador normal
+    // apenas em memória, sem guardar nada na base de dados.
+    currentProfile = profileSnapshot.exists()
+        ? profileSnapshot.data()
+        : {
+            uid: currentUser.uid,
+            email: currentUser.email ?? "",
+            displayName: emailName,
+            role: "utilizador"
+        };
+
+    const displayName = (
+        currentProfile.displayName || emailName || "Utilizador"
+    ).trim();
+
+    const firstName = displayName.split(/\s+/)[0];
+
+    const initials = displayName
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map(part => part[0])
+        .join("")
+        .toUpperCase() || "CR";
+
+    const manager = currentProfile.role === "gestor";
+
+    $("#homeWelcome").textContent = `Olá, ${firstName}!`;
+    $("#sidebarUserName").textContent = displayName;
+    $("#sidebarUserRole").textContent = manager ? "Gestor" : "Utilizador";
+    $("#sidebarInitials").textContent = initials;
+    $("#headerRole").textContent = manager ? "Gestor" : "Utilizador";
+    $("#homeNavText").textContent = manager
+        ? "Painel de gestão"
+        : "Visão geral";
+    $("#navLabel").textContent = manager
+        ? "ADMINISTRAÇÃO"
+        : "MENU PRINCIPAL";
 }
 
 function configureRoleUI() {
@@ -678,7 +697,7 @@ $("#mobileMenuBtn").addEventListener("click", () => $("#sidebar").classList.togg
 $("#logoutBtn").addEventListener("click", async () => {
   try {
     await signOut(auth);
-    window.location.replace("/index.html");
+    window.location.replace("./index.html");
   } catch (error) {
     console.error("Erro ao terminar sessão:", error);
     showNotice("Não foi possível terminar sessão. Tenta novamente.", true);

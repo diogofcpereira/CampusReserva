@@ -1,0 +1,132 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isManager() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'gestor';
+    }
+
+    function validStartTime(time) {
+      return time in [
+        '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
+        '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
+        '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
+        '17:00', '17:30', '18:00', '18:30', '19:00', '19:30',
+        '20:00', '20:30', '21:00', '21:30'
+      ];
+    }
+
+    match /users/{userId} {
+      // Utilizador vê o próprio perfil. Gestores podem consultar todos os perfis.
+      allow read: if signedIn() && (request.auth.uid == userId || isManager());
+
+      // O primeiro perfil só pode ser criado como utilizador normal.
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.role == 'utilizador'
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'createdAt', 'updatedAt']);
+
+      // Gestores podem alterar o papel de OUTROS perfis, nunca o próprio através da aplicação.
+      // Utilizadores normais só podem atualizar o nome visível, não o papel, UID ou email.
+      allow update: if (
+          isManager()
+          && request.auth.uid != userId
+          && request.resource.data.role in ['utilizador', 'gestor']
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'updatedAt'])
+        ) || (
+          signedIn()
+          && request.auth.uid == userId
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'updatedAt'])
+        );
+
+      // A remoção de contas de autenticação não é feita pela aplicação web.
+      allow delete: if false;
+    }
+
+    match /resources/{resourceId} {
+      // Utilizadores só podem ler recursos ativos. Gestores também veem os desativados.
+      allow read: if signedIn() && (resource.data.active == true || isManager());
+      allow create: if isManager()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.type in ['sala', 'equipamento']
+        && request.resource.data.location is string
+        && request.resource.data.active is bool
+        && request.resource.data.keys().hasOnly(['name', 'type', 'location', 'capacity', 'description', 'active', 'createdAt', 'updatedAt']);
+      allow update: if isManager()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.type in ['sala', 'equipamento']
+        && request.resource.data.location is string
+        && request.resource.data.active is bool
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.keys().hasOnly(['name', 'type', 'location', 'capacity', 'description', 'active', 'createdAt', 'updatedAt']);
+      // Os recursos são desativados em vez de apagados, para preservar o histórico das reservas.
+      allow delete: if false;
+    }
+
+    match /reservations/{reservationId} {
+      // Utilizadores consultam apenas as suas reservas. Gestores podem consultar todas.
+      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isManager());
+
+      // Cada reserva criada pelo utilizador tem de criar um bloqueio correspondente na mesma transação.
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'ativa'
+        && request.resource.data.resourceId is string
+        && request.resource.data.date is string
+        && validStartTime(request.resource.data.startTime)
+        && request.resource.data.slotId == request.resource.data.resourceId + '_' + request.resource.data.date + '_' + request.resource.data.startTime
+        && exists(/databases/$(database)/documents/resources/$(request.resource.data.resourceId))
+        && get(/databases/$(database)/documents/resources/$(request.resource.data.resourceId)).data.active == true
+        && existsAfter(/databases/$(database)/documents/reservationSlots/$(request.resource.data.slotId))
+        && getAfter(/databases/$(database)/documents/reservationSlots/$(request.resource.data.slotId)).data.reservationId == reservationId
+        && getAfter(/databases/$(database)/documents/reservationSlots/$(request.resource.data.slotId)).data.resourceId == request.resource.data.resourceId
+        && getAfter(/databases/$(database)/documents/reservationSlots/$(request.resource.data.slotId)).data.date == request.resource.data.date
+        && getAfter(/databases/$(database)/documents/reservationSlots/$(request.resource.data.slotId)).data.startTime == request.resource.data.startTime
+        && request.resource.data.keys().hasOnly(['userId', 'resourceId', 'resourceName', 'resourceType', 'date', 'startTime', 'slotId', 'status', 'createdAt']);
+
+      // O dono pode cancelar as suas reservas; um gestor pode cancelar qualquer reserva.
+      // Em ambos os casos, o bloqueio do horário tem de ser removido na mesma transação.
+      allow update: if signedIn()
+        && (resource.data.userId == request.auth.uid || isManager())
+        && resource.data.status == 'ativa'
+        && request.resource.data.status == 'cancelada'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt'])
+        && !existsAfter(/databases/$(database)/documents/reservationSlots/$(resource.data.slotId));
+      allow delete: if false;
+    }
+
+    match /reservationSlots/{slotId} {
+      // Contém apenas metadados de disponibilidade, sem nome/email do utilizador.
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && validStartTime(request.resource.data.startTime)
+        && slotId == request.resource.data.resourceId + '_' + request.resource.data.date + '_' + request.resource.data.startTime
+        && request.resource.data.keys().hasOnly(['reservationId', 'resourceId', 'date', 'startTime'])
+        && existsAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId))
+        && getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.userId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.status == 'ativa'
+        && getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.slotId == slotId
+        && getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.resourceId == request.resource.data.resourceId
+        && getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.date == request.resource.data.date
+        && getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.startTime == request.resource.data.startTime;
+      allow update: if false;
+      allow delete: if signedIn()
+        && existsAfter(/databases/$(database)/documents/reservations/$(resource.data.reservationId))
+        && getAfter(/databases/$(database)/documents/reservations/$(resource.data.reservationId)).data.status == 'cancelada'
+        && (getAfter(/databases/$(database)/documents/reservations/$(resource.data.reservationId)).data.userId == request.auth.uid || isManager());
+    }
+  }
+}
