@@ -52,49 +52,27 @@ service cloud.firestore {
       return durationMinutes in [30, 60, 90, 120, 150, 180];
     }
 
-    function nextTime(time) {
-      return time == '08:00' ? '08:30' :
-        time == '08:30' ? '09:00' :
-        time == '09:00' ? '09:30' :
-        time == '09:30' ? '10:00' :
-        time == '10:00' ? '10:30' :
-        time == '10:30' ? '11:00' :
-        time == '11:00' ? '11:30' :
-        time == '11:30' ? '12:00' :
-        time == '12:00' ? '12:30' :
-        time == '12:30' ? '13:00' :
-        time == '13:00' ? '13:30' :
-        time == '13:30' ? '14:00' :
-        time == '14:00' ? '14:30' :
-        time == '14:30' ? '15:00' :
-        time == '15:00' ? '15:30' :
-        time == '15:30' ? '16:00' :
-        time == '16:00' ? '16:30' :
-        time == '16:30' ? '17:00' :
-        time == '17:00' ? '17:30' :
-        time == '17:30' ? '18:00' :
-        time == '18:00' ? '18:30' :
-        time == '18:30' ? '19:00' :
-        time == '19:00' ? '19:30' :
-        time == '19:30' ? '20:00' :
-        time == '20:00' ? '20:30' :
-        time == '20:30' ? '21:00' :
-        time == '21:00' ? '21:30' :
-        time == '21:30' ? '22:00' : '';
+    // [CORRIGIDO] Aritmética de minutos em vez de cadeias de nextTime(): as cadeias
+    // ultrapassavam o limite de 1000 expressões avaliadas por pedido nas durações longas.
+    function toMinutes(time) {
+      return int(time.split(':')[0]) * 60 + int(time.split(':')[1]);
+    }
+
+    function twoDigits(n) {
+      return n < 10 ? '0' + string(n) : string(n);
+    }
+
+    function fromMinutes(total) {
+      return twoDigits(int((total - total % 60) / 60)) + ':' + twoDigits(total % 60);
     }
 
     function endTimeFor(time, durationMinutes) {
-      return durationMinutes == 30 ? nextTime(time) :
-        durationMinutes == 60 ? nextTime(nextTime(time)) :
-        durationMinutes == 90 ? nextTime(nextTime(nextTime(time))) :
-        durationMinutes == 120 ? nextTime(nextTime(nextTime(nextTime(time)))) :
-        durationMinutes == 150 ? nextTime(nextTime(nextTime(nextTime(nextTime(time))))) :
-        durationMinutes == 180 ? nextTime(nextTime(nextTime(nextTime(nextTime(nextTime(time)))))) : '';
+      return fromMinutes(toMinutes(time) + durationMinutes);
     }
 
     function slotDocumentId(resourceId, date, time, resourceType, unitNumber) {
       return resourceType == 'equipamento'
-        ? resourceId + '_' + date + '_' + time + '_unit_' + unitNumber
+        ? resourceId + '_' + date + '_' + time + '_unit_' + string(unitNumber)  // [CORRIGIDO] string + int dava erro
         : resourceId + '_' + date + '_' + time;
     }
 
@@ -133,10 +111,10 @@ service cloud.firestore {
       ) || (
         reservationData.resourceType == 'equipamento'
         && (
-          (!resourceData.keys().hasAny(['capacity']) && reservationData.unitNumber == 1)
+          // [CORRIGIDO] equipamento sem capacity ou com capacity null conta como 1 unidade (como no dashboard.js)
+          (resourceData.get('capacity', null) == null && reservationData.unitNumber == 1)
           || (
-            resourceData.keys().hasAny(['capacity'])
-            && resourceData.capacity is int
+            resourceData.get('capacity', null) is int
             && resourceData.capacity >= 1
             && reservationData.unitNumber <= resourceData.capacity
           )
@@ -150,69 +128,34 @@ service cloud.firestore {
         : data.slotId == slotId;
     }
 
-    function timeAtOffset(time, offset) {
-      return offset == 0 ? time :
-        offset == 1 ? nextTime(time) :
-        offset == 2 ? nextTime(nextTime(time)) :
-        offset == 3 ? nextTime(nextTime(nextTime(time))) :
-        offset == 4 ? nextTime(nextTime(nextTime(nextTime(time)))) :
-        offset == 5 ? nextTime(nextTime(nextTime(nextTime(nextTime(time))))) : '';
+    // [SIMPLIFICADO] A reserva só confirma que cada bloqueio da lista existe no fim da operação e
+    // aponta para ela. Que cada bloqueio tem o ID certo e está dentro do intervalo da reserva é
+    // verificado na regra de reservationSlots (cada bloqueio tem o seu próprio limite de avaliação).
+    // Antes, verificar tudo aqui ultrapassava o limite de 1000 expressões nas reservas de 2h30 e 3h.
+    function lockBelongs(slotIds, reservationId, index) {
+      return getAfter(/databases/$(database)/documents/reservationSlots/$(slotIds[index])).data.reservationId == reservationId;
     }
 
-    function lockMatchesReservation(data, reservationId, index, expectedTime) {
-      let lockId = data.slotIds[index];
-      let lockPath = /databases/$(database)/documents/reservationSlots/$(lockId);
-      return lockId == slotDocumentId(
-          data.resourceId, data.date, expectedTime,
-          data.resourceType, data.unitNumber
-        )
-        && existsAfter(lockPath)
-        && getAfter(lockPath).data.reservationId == reservationId
-        && getAfter(lockPath).data.resourceId == data.resourceId
-        && getAfter(lockPath).data.date == data.date
-        && getAfter(lockPath).data.startTime == expectedTime
-        && getAfter(lockPath).data.unitNumber == data.unitNumber;
-    }
-
+    // Uma reserva de N meias horas tem exatamente N bloqueios diferentes (máximo 6 = 3 horas).
     function reservationLocksMatch(data, reservationId) {
       return data.slotIds is list
         && data.slotIds.size() >= 1
         && data.slotIds.size() <= 6
+        && data.slotIds.size() * 30 == data.durationMinutes
+        && data.slotIds.toSet().size() == data.slotIds.size()
         && data.slotId == data.slotIds[0]
-        && (
-          (data.durationMinutes == 30 && data.slotIds.size() == 1
-            && lockMatchesReservation(data, reservationId, 0, timeAtOffset(data.startTime, 0)))
-          ||
-          (data.durationMinutes == 60 && data.slotIds.size() == 2
-            && lockMatchesReservation(data, reservationId, 0, timeAtOffset(data.startTime, 0))
-            && lockMatchesReservation(data, reservationId, 1, timeAtOffset(data.startTime, 1)))
-          ||
-          (data.durationMinutes == 90 && data.slotIds.size() == 3
-            && lockMatchesReservation(data, reservationId, 0, timeAtOffset(data.startTime, 0))
-            && lockMatchesReservation(data, reservationId, 1, timeAtOffset(data.startTime, 1))
-            && lockMatchesReservation(data, reservationId, 2, timeAtOffset(data.startTime, 2)))
-          ||
-          (data.durationMinutes == 120 && data.slotIds.size() == 4
-            && lockMatchesReservation(data, reservationId, 0, timeAtOffset(data.startTime, 0))
-            && lockMatchesReservation(data, reservationId, 1, timeAtOffset(data.startTime, 1))
-            && lockMatchesReservation(data, reservationId, 2, timeAtOffset(data.startTime, 2))
-            && lockMatchesReservation(data, reservationId, 3, timeAtOffset(data.startTime, 3)))
-          ||
-          (data.durationMinutes == 150 && data.slotIds.size() == 5
-            && lockMatchesReservation(data, reservationId, 0, timeAtOffset(data.startTime, 0))
-            && lockMatchesReservation(data, reservationId, 1, timeAtOffset(data.startTime, 1))
-            && lockMatchesReservation(data, reservationId, 2, timeAtOffset(data.startTime, 2))
-            && lockMatchesReservation(data, reservationId, 3, timeAtOffset(data.startTime, 3))
-            && lockMatchesReservation(data, reservationId, 4, timeAtOffset(data.startTime, 4)))
-          ||
-          (data.durationMinutes == 180 && data.slotIds.size() == 6
-            && lockMatchesReservation(data, reservationId, 0, timeAtOffset(data.startTime, 0))
-            && lockMatchesReservation(data, reservationId, 1, timeAtOffset(data.startTime, 1))
-            && lockMatchesReservation(data, reservationId, 2, timeAtOffset(data.startTime, 2))
-            && lockMatchesReservation(data, reservationId, 3, timeAtOffset(data.startTime, 3))
-            && lockMatchesReservation(data, reservationId, 4, timeAtOffset(data.startTime, 4))
-            && lockMatchesReservation(data, reservationId, 5, timeAtOffset(data.startTime, 5)))
-        );
+        && lockBelongs(data.slotIds, reservationId, 0)
+        && (data.slotIds.size() < 2 || lockBelongs(data.slotIds, reservationId, 1))
+        && (data.slotIds.size() < 3 || lockBelongs(data.slotIds, reservationId, 2))
+        && (data.slotIds.size() < 4 || lockBelongs(data.slotIds, reservationId, 3))
+        && (data.slotIds.size() < 5 || lockBelongs(data.slotIds, reservationId, 4))
+        && (data.slotIds.size() < 6 || lockBelongs(data.slotIds, reservationId, 5));
+    }
+
+    // [NOVO] Um bloqueio só é válido se a sua meia hora estiver dentro do intervalo da reserva.
+    function lockInsideReservation(lockData, reservationData) {
+      return toMinutes(lockData.startTime) >= toMinutes(reservationData.startTime)
+        && toMinutes(lockData.startTime) < toMinutes(reservationData.endTime);
     }
 
     function reservationLocksRemoved(data) {
@@ -342,6 +285,7 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.unitNumber == request.resource.data.unitNumber
         && getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.resourceType == get(/databases/$(database)/documents/resources/$(request.resource.data.resourceId)).data.type
         && reservationHasSlot(getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data, slotId)
+        && lockInsideReservation(request.resource.data, getAfter(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data)
         && slotId == slotDocumentId(
           request.resource.data.resourceId,
           request.resource.data.date,
