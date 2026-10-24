@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="CampusReserva — reserva de salas e equipamentos do ISLA Gaia.">
+  <title>CampusReserva | Área reservada</title>
+  <link rel="stylesheet" href="/css/dashboard.css">
+  <script type="module" src="/js/dashboard.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="/dashboard.html" aria-label="CampusReserva — início">
+        <span class="brand-mark" aria-hidden="true">I</span>
+        <span class="brand-copy"><strong>ISLA Gaia</strong><small>Reserva de espaços</small></span>
+      </a>
+
+      <p class="nav-label" id="navLabel">MENU PRINCIPAL</p>
+      <nav class="main-nav" aria-label="Navegação principal">
+        <button class="nav-link active" type="button" data-view="home"><span class="nav-icon" aria-hidden="true">⌂</span><span id="homeNavText">Visão geral</span></button>
+
+        <button class="nav-link user-only" type="button" data-view="resources" data-role="utilizador"><span class="nav-icon" aria-hidden="true">▦</span><span>Salas e equipamentos</span></button>
+        <button class="nav-link user-only" type="button" data-view="reservations" data-role="utilizador"><span class="nav-icon" aria-hidden="true">✓</span><span>As minhas reservas</span></button>
+
+        <button class="nav-link manager-only" type="button" data-view="manager-reservations" data-role="gestor" hidden><span class="nav-icon" aria-hidden="true">▤</span><span>Gerir reservas</span></button>
+        <button class="nav-link manager-only" type="button" data-view="manage-resources" data-role="gestor" hidden><span class="nav-icon" aria-hidden="true">▦</span><span>Salas e equipamentos</span></button>
+        <button class="nav-link manager-only" type="button" data-view="manage-users" data-role="gestor" hidden><span class="nav-icon" aria-hidden="true">♙</span><span>Gestão de utilizadores</span></button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-user-icon" id="sidebarInitials">CR</div>
+        <div class="sidebar-user-copy"><strong id="sidebarUserName">A carregar...</strong><small id="sidebarUserRole">Utilizador</small></div>
+        <button class="icon-button logout-button" id="logoutBtn" type="button" title="Terminar sessão" aria-label="Terminar sessão">↪</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <button class="mobile-menu-button" id="mobileMenuBtn" type="button" aria-label="Abrir menu">☰</button>
+        <div class="topbar-heading"><p>ISLA Gaia <span>/</span> CampusReserva</p><h1 id="pageTitle">Visão geral</h1><p class="campus-address">Rua Diogo de Macedo, 192 · 4400-107 Vila Nova de Gaia</p></div>
+        <div class="topbar-badges"><span class="date-pill" id="todayLabel">Hoje</span><span class="environment-pill"><span aria-hidden="true">●</span> Firebase</span><span class="role-pill" id="headerRole">Utilizador</span></div>
+      </header>
+
+      <div class="notice" id="globalNotice" role="status" aria-live="polite" hidden></div>
+      <div class="loading-panel" id="loadingPanel"><span class="spinner"></span><p>A carregar a tua área pessoal...</p></div>
+
+      <div id="appContent" hidden>
+        <!-- Dashboard exclusivo do utilizador comum -->
+        <section class="page-view active" id="view-home" aria-label="Dashboard">
+          <div id="userHome" data-role="utilizador">
+            <div class="welcome-row"><div><span class="eyebrow">ÁREA PESSOAL</span><h2 id="homeWelcome">Olá!</h2><p>Consulta os espaços disponíveis e organiza as tuas próximas atividades no ISLA Gaia.</p></div><button class="button button-primary" type="button" data-go-view="resources">＋ Fazer uma reserva</button></div>
+            <div class="stats-grid">
+              <article class="stat-card"><div class="stat-icon stat-icon-rose">▤</div><div><strong id="userStatReservations">0</strong><p>Minhas reservas futuras</p></div></article>
+              <article class="stat-card"><div class="stat-icon stat-icon-sand">▦</div><div><strong id="userStatRooms">0</strong><p>Salas disponíveis</p></div></article>
+              <article class="stat-card"><div class="stat-icon stat-icon-grey">▣</div><div><strong id="userStatEquipment">0</strong><p>Equipamentos disponíveis</p></div></article>
+            </div>
+            <section class="resource-home-section">
+              <div class="section-heading"><div><h2>Salas e equipamentos</h2><p>Seleciona um recurso para consultar os horários de 30 minutos e fazer uma reserva.</p></div><button class="text-button" type="button" data-go-view="resources">Ver catálogo completo →</button></div>
+              <div id="homeResourceGrid" class="resource-grid"></div>
+            </section>
+            <section class="panel upcoming-panel"><div class="panel-heading"><div><h2>Próximas reservas</h2><p>Os teus horários agendados.</p></div><button class="text-button" type="button" data-go-view="reservations">Ver todas →</button></div><div id="userHomeReservations" class="compact-list"></div></section>
+          </div>
+
+          <!-- Dashboard separado do gestor: visão global e atalhos administrativos -->
+          <div id="managerHome" data-role="gestor" hidden>
+            <div class="welcome-row"><div><span class="eyebrow">ADMINISTRAÇÃO DO CAMPUS</span><h2>Painel de gestão</h2><p>Gere recursos, reservas e permissões de acesso do CampusReserva.</p></div><span class="admin-label">Acesso de gestor</span></div>
+            <div class="stats-grid stats-grid-four">
+              <article class="stat-card"><div class="stat-icon stat-icon-rose">▦</div><div><strong id="managerStatResources">0</strong><p>Recursos ativos</p></div></article>
+              <article class="stat-card"><div class="stat-icon stat-icon-sand">▤</div><div><strong id="managerStatReservations">0</strong><p>Reservas ativas</p></div></article>
+              <article class="stat-card"><div class="stat-icon stat-icon-grey">♙</div><div><strong id="managerStatUsers">0</strong><p>Contas registadas</p></div></article>
+              <article class="stat-card"><div class="stat-icon stat-icon-rose">★</div><div><strong id="managerStatManagers">0</strong><p>Gestores</p></div></article>
+            </div>
+            <div class="admin-shortcuts">
+              <button class="admin-shortcut" type="button" data-go-view="manage-resources"><span class="shortcut-mark">＋</span><span><strong>Adicionar recursos</strong><small>Registar ou editar salas e equipamentos</small></span><span class="shortcut-arrow">→</span></button>
+              <button class="admin-shortcut" type="button" data-go-view="manager-reservations"><span class="shortcut-mark">▤</span><span><strong>Gerir reservas</strong><small>Consultar e cancelar reservas de qualquer utilizador</small></span><span class="shortcut-arrow">→</span></button>
+              <button class="admin-shortcut" type="button" data-go-view="manage-users"><span class="shortcut-mark">♙</span><span><strong>Gerir permissões</strong><small>Promover utilizadores a gestor ou retirar permissões</small></span><span class="shortcut-arrow">→</span></button>
+            </div>
+            <section class="panel upcoming-panel"><div class="panel-heading"><div><h2>Reservas mais próximas</h2><p>Visão administrativa das reservas ativas.</p></div><button class="text-button" type="button" data-go-view="manager-reservations">Ver todas →</button></div><div id="managerHomeReservations" class="compact-list"></div></section>
+          </div>
+        </section>
+
+        <!-- Área do utilizador: catálogo e popup para consultar/reservar horários -->
+        <section class="page-view" id="view-resources" data-role="utilizador" aria-labelledby="resourcesTitle" hidden>
+          <div class="section-heading"><div><span class="eyebrow">CATÁLOGO DO CAMPUS</span><h2 id="resourcesTitle">Salas e equipamentos</h2><p>Escolhe um recurso para consultar os horários. Os períodos ocupados aparecem a vermelho.</p></div></div>
+          <div class="filter-row" role="group" aria-label="Filtrar recursos">
+            <button class="filter-button active" type="button" data-filter="todos">Todos</button>
+            <button class="filter-button" type="button" data-filter="sala">Salas</button>
+            <button class="filter-button" type="button" data-filter="equipamento">Equipamentos</button>
+          </div>
+          <div id="resourceGrid" class="resource-grid"></div>
+        </section>
+
+        <section class="page-view" id="view-reservations" data-role="utilizador" aria-labelledby="reservationsTitle" hidden>
+          <div class="section-heading"><div><span class="eyebrow">ÁREA PESSOAL</span><h2 id="reservationsTitle">As minhas reservas</h2><p>Consulta os teus horários e cancela as reservas que já não precisas.</p></div><button class="button button-primary" type="button" data-go-view="resources">＋ Nova reserva</button></div>
+          <div class="panel reservations-panel"><div class="reservation-tabs"><span class="reservation-tab active">Histórico e próximas</span><span class="reservations-count" id="userReservationsCount">0 reservas</span></div><div id="userReservationsList" class="reservations-list"></div></div>
+        </section>
+
+        <!-- Área exclusiva do gestor -->
+        <section class="page-view" id="view-manager-reservations" data-role="gestor" aria-labelledby="managerReservationsTitle" hidden>
+          <div class="section-heading"><div><span class="eyebrow">ADMINISTRAÇÃO</span><h2 id="managerReservationsTitle">Gestão de reservas</h2><p>Consulta as reservas de todos os utilizadores e cancela uma reserva quando necessário.</p></div></div>
+          <div class="filter-row" role="group" aria-label="Filtrar reservas por estado">
+            <button class="filter-button manager-reservation-filter active" type="button" data-manager-reservation-filter="todas">Todas</button>
+            <button class="filter-button manager-reservation-filter" type="button" data-manager-reservation-filter="ativa">Ativas</button>
+            <button class="filter-button manager-reservation-filter" type="button" data-manager-reservation-filter="cancelada">Canceladas</button>
+          </div>
+          <div class="panel reservations-panel"><div class="reservation-tabs"><span class="reservation-tab active">Reservas de todos os utilizadores</span><span class="reservations-count" id="managerReservationsCount">0 reservas</span></div><div id="managerReservationsList" class="reservations-list"></div></div>
+        </section>
+
+        <section class="page-view" id="view-manage-resources" data-role="gestor" aria-labelledby="manageResourcesTitle" hidden>
+          <div class="section-heading"><div><span class="eyebrow">ADMINISTRAÇÃO</span><h2 id="manageResourcesTitle">Gestão de salas e equipamentos</h2><p>Cria, edita e desativa os recursos que podem ser reservados no ISLA Gaia.</p></div></div>
+          <div class="management-layout">
+            <section class="panel manager-form-panel"><div class="panel-heading"><div><h2 id="resourceFormTitle">Adicionar recurso</h2><p>Preenche os dados da sala ou equipamento.</p></div></div>
+              <form id="resourceForm" class="booking-form">
+                <input type="hidden" id="editingResourceId" value="">
+                <div class="form-field"><label for="resourceName">Nome</label><input type="text" id="resourceName" maxlength="90" placeholder="Ex.: Sala de aula" required></div>
+                <div class="form-field"><label for="resourceType">Tipo</label><select id="resourceType" required><option value="sala">Sala</option><option value="equipamento">Equipamento eletrónico</option></select></div>
+                <div class="form-field"><label for="resourceLocation">Localização</label><input type="text" id="resourceLocation" maxlength="100" placeholder="Ex.: Piso 1" required></div>
+                <div class="form-field"><label for="resourceCapacity">Capacidade/unidades (opcional)</label><input type="number" id="resourceCapacity" min="1" max="1000" placeholder="Número de pessoas/unidades"></div>
+                <div class="form-field"><label for="resourceDescription">Descrição</label><textarea id="resourceDescription" rows="3" maxlength="500" placeholder="Características e notas úteis"></textarea></div>
+                <label class="check-field"><input type="checkbox" id="resourceActive" checked><span>Disponível para novas reservas</span></label>
+                <p class="form-error" id="resourceError" role="alert" hidden></p>
+                <div class="form-actions"><button class="button button-primary" id="saveResourceBtn" type="submit">Guardar recurso</button><button class="button button-secondary" id="cancelEditBtn" type="button" hidden>Cancelar edição</button></div>
+              </form>
+            </section>
+            <section class="panel manager-list-panel"><div class="panel-heading"><div><h2>Recursos registados</h2><p>Os recursos desativados deixam de aceitar novas reservas.</p></div><span id="managerResourceCount" class="count-chip">0</span></div><div id="managerResourceList" class="manager-resource-list"></div></section>
+          </div>
+        </section>
+
+        <section class="page-view" id="view-manage-users" data-role="gestor" aria-labelledby="manageUsersTitle" hidden>
+          <div class="section-heading"><div><span class="eyebrow">ADMINISTRAÇÃO</span><h2 id="manageUsersTitle">Gestão de utilizadores</h2><p>Controla quem tem permissões de gestor. As contas são criadas através do Firebase Authentication.</p></div></div>
+          <div class="notice notice-info">Apenas os gestores podem ver esta lista ou alterar os perfis de acesso. Não podes retirar as tuas próprias permissões nesta página.</div>
+          <div class="panel users-panel"><div class="panel-heading"><div><h2>Contas registadas</h2><p>Promove um utilizador a gestor ou retira-lhe esse papel.</p></div><span id="managerUserCount" class="count-chip">0</span></div><div id="managerUsersList" class="manager-users-list"></div></div>
+        </section>
+      </div>
+
+      <footer class="app-footer"><span>CampusReserva · ISLA Gaia</span><span>Plataforma de reserva de espaços e equipamentos</span></footer>
+    </main>
+  </div>
+
+  <!-- Modal de horários: os intervalos ocupados permanecem visíveis a vermelho, mas não são reserváveis. -->
+  <dialog class="resource-dialog" id="resourceDialog" aria-labelledby="dialogResourceName">
+    <div class="dialog-header"><div class="dialog-resource-heading"><span class="resource-symbol" id="dialogResourceSymbol" aria-hidden="true">▦</span><div><span class="eyebrow">CONSULTAR DISPONIBILIDADE</span><h2 id="dialogResourceName">Recurso</h2><p id="dialogResourceMeta">Localização</p></div></div><button class="dialog-close" type="button" id="closeResourceDialog" aria-label="Fechar">×</button></div>
+    <div class="dialog-content">
+      <div class="dialog-date-field"><label for="dialogDate">Data da reserva</label><input type="date" id="dialogDate" required></div>
+      <div class="slot-legend"><span><i class="legend-dot legend-free"></i>Disponível</span><span><i class="legend-dot legend-occupied"></i>Ocupado</span><span><i class="legend-dot legend-past"></i>Passado</span></div>
+      <p class="availability-message" id="dialogAvailabilityMessage" role="status" aria-live="polite">A consultar horários...</p>
+      <div class="slot-grid" id="slotGrid" aria-label="Horários de 30 minutos"></div>
+      <p class="dialog-error" id="dialogError" role="alert" hidden></p>
+      <div class="dialog-selection"><div><small>HORÁRIO SELECIONADO</small><strong id="selectedSlotLabel">Nenhum horário selecionado</strong></div><button class="button button-primary" type="button" id="confirmReservationBtn" disabled>Confirmar reserva</button></div>
+      <p class="dialog-footnote">Cada reserva dura 30 minutos. Um horário ocupado não pode ser reservado por outra pessoa.</p>
+    </div>
+  </dialog>
+</body>
+</html>
