@@ -1,5 +1,7 @@
 # Deploy automático (R6): a cada push/merge na branch main.
-# 1.º testa as Security Rules no emulador; 2.º só se os testes passarem, publica no Firebase Hosting.
+# 1.º testa as Security Rules no emulador;
+# 2.º só se os testes passarem, publica as Security Rules no Firestore;
+# 3.º só depois publica a aplicação no Firebase Hosting.
 name: Deploy to Firebase Hosting on merge
 
 on:
@@ -24,9 +26,25 @@ jobs:
       - run: npm ci
       - run: npm run test:regras
 
+  publicar_regras:
+    name: Publicar Security Rules
+    needs: testes_regras
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CAMPUSRESERVAGE }}
+      - run: npx firebase deploy --only firestore:rules --project campusreservage --non-interactive
+
   build_and_deploy:
     name: Publicar no Hosting
-    needs: testes_regras
+    needs: publicar_regras
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
