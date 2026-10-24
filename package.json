@@ -1,5 +1,17 @@
 {
-  "dependencies": {
-    "firebase": "^13.0.0"
+  "name": "campusreserva",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "emuladores": "firebase emulators:start --export-on-exit=./dados-emulador",
+    "emuladores:continuar": "firebase emulators:start --import=./dados-emulador --export-on-exit",
+    "test": "node --test tests/firestore.rules.test.js",
+    "test:regras": "firebase emulators:exec --only firestore --project demo-campusreserva \"npm test\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase": "^13.0.0",
+    "firebase-tools": "^15.0.0"
   }
 }
