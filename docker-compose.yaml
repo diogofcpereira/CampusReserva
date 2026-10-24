@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  firebase-emuladores:
+    image: campusreserva-emuladores
+    volumes:
+      - .:/app
+    ports:
+      - "4000:4000"
+      - "9099:9099"
+      - "8080:8080"
+      - "5000:5000"
+    stdin_open: true
+    tty: true
