@@ -23,9 +23,9 @@ const firebaseConfig = {
   appId: "1:601060186:web:877fe843714f16b8f85563"
 };
 
-// Deixa false para usar o projeto Firebase real.
-// Para testar localmente, inicia os emuladores e muda para true.
-const USE_FIREBASE_EMULATORS = false;
+// Em desenvolvimento (aplicação aberta em localhost) usa os emuladores locais;
+// Em produção (campusreservage.web.app) usa o projeto Firebase.
+const USE_FIREBASE_EMULATORS = ["localhost", "127.0.0.1"].includes(location.hostname);
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
