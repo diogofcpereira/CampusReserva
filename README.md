@@ -1,6 +1,6 @@
 # CampusReserva
 
-Aplicação web para reservar salas e equipamentos do ISLA Gaia. Projeto prático de Computação em Nuvem (Mestrado, 2026/27).
+Aplicação web para reservar salas e equipamentos do ISLA Gaia. Projeto prático de Computação em Nuvem (Mestrado em Engenharia Informática, 2026/27).
 
 **Produção:** https://campusreservage.web.app · **Projeto Firebase:** `campusreservage` (plano Spark, gratuito)
 
@@ -59,7 +59,7 @@ Front-end em HTML, CSS e JavaScript (módulos ES), com o SDK Firebase 10.4.0 imp
 **Os perfis não são criados automaticamente.** Uma conta sem documento em `users` é tratada como utilizador. Para criar um perfil (em produção, na consola Firebase; localmente, na Emulator UI):
 
 1. Em **Authentication**, copiar o **User UID** da conta.
-2. Em **Firestore**, coleção `users`, criar um documento cujo **ID é o UID** (não basta ter um campo com o UID).
+2. Em **Firestore**, coleção `users`, criar um documento cujo **ID é o UID**.
 3. Campos: `uid`, `email`, `displayName`, `role` (`"utilizador"` ou `"gestor"`).
 
 A partir daí, um gestor pode promover outros utilizadores na aplicação.
@@ -68,13 +68,11 @@ A partir daí, um gestor pode promover outros utilizadores na aplicação.
 
 ## Modelo de dados (Cloud Firestore)
 
-Os nomes dos campos estão em inglês.
-
 **`users/{uid}`**: `uid`, `email`, `displayName`, `role` (`utilizador` | `gestor`), `createdAt`, `updatedAt`
 
 **`resources/{autoId}`**: `name`, `type` (`sala` | `equipamento`), `location`, `capacity`, `description`, `active`, `createdAt`, `updatedAt`
 - Numa **sala**, `capacity` é o número de lugares (opcional).
-- Num **equipamento**, `capacity` é o **número de unidades** (obrigatório, 1–1000); cada unidade é reservável em separado.
+- Num **equipamento**, `capacity` é o **número de unidades**; cada unidade é reservável em separado.
 - Recursos não se apagam: desativam-se com `active: false`.
 
 **`reservations/{autoId}`**: `userId`, `resourceId`, `resourceName`, `resourceType`, `date` (`AAAA-MM-DD`), `startTime`, `endTime` (`HH:MM`), `durationMinutes`, `unitNumber`, `slotId`, `slotIds`, `status` (`ativa` | `cancelada`), `createdAt`, `cancelledAt`
@@ -121,10 +119,10 @@ A exclusividade é imposta pelas **regras**, não pelo browser:
 |---|---|---|
 | URL da aplicação | https://campusreservage.web.app | http://localhost:5000 |
 | Authentication e Firestore | Serviços reais da Google | Emuladores locais (Auth 9099, Firestore 8080) |
-| Contas e dados | Reais | De teste, só no teu computador |
+| Contas e dados | Reais | Máquina (localmente) |
 | Security Rules | Publicadas pelo pipeline | Lidas diretamente de `firestore.rules` |
 
-A escolha é **automática** em `public/js/firebase.js`: se a aplicação estiver aberta em `localhost` ou `127.0.0.1`, liga-se aos emuladores; caso contrário, ao Firebase real. Não é preciso alterar nada antes de fazer commit.
+A escolha é **automática** em `public/js/firebase.js`: se a aplicação estiver aberta em `localhost` ou `127.0.0.1`, liga-se aos emuladores; caso contrário, ao Firebase real.
 
 Os dois ambientes são completamente separados: as contas de produção não existem no emulador e vice-versa.
 
@@ -156,7 +154,7 @@ A pasta `dados-emulador/` está no `.gitignore`: os dados de teste de cada um n�
 
 ### Alternativa: Docker
 
-O `Dockerfile` cria um ambiente com Node, Java e a Firebase CLI, e arranca os emuladores.
+O `Dockerfile` cria um ambiente com Node, Java e a Firebase CLI, e arrancar os emuladores.
 
 ```bash
 docker build -t campusreserva-emuladores .
@@ -166,7 +164,6 @@ docker compose up
 Notas:
 - O contentor corre como root, por isso os ficheiros `*.log` que cria na pasta do projeto ficam do root (ver [Resolução de problemas](#resolução-de-problemas)).
 - Não correr os emuladores por Docker e por `npm run emuladores` ao mesmo tempo: as portas entram em conflito.
-- Preferir os scripts npm para o dia a dia.
 
 ---
 
@@ -176,7 +173,7 @@ Notas:
 npm run test:regras
 ```
 
-Arranca um emulador temporário do Firestore com o projeto `demo-campusreserva` (o prefixo `demo-` garante que nunca se contacta o projeto real), corre os testes e desliga-o.
+Arrancar um emulador temporário do Firestore com o projeto `demo-campusreserva` (o prefixo `demo-` garante que nunca se contacta o projeto real).
 
 **58 testes em 3 grupos:**
 - **Perfis:** criação, promoção, leitura de perfis alheios.
