@@ -13,40 +13,156 @@
   <main class="page">
     <section class="welcome-panel" aria-labelledby="welcome-title">
       <div class="brand">
-        <div class="brand-icon"><img src="./assets/isla-gaia-icon.svg" alt="Logótipo ISLA Gaia"></div>
-        <div><div class="brand-name">CampusReserva</div><div class="brand-subtitle">ISLA Gaia · Gestão de espaços</div></div>
+        <div class="brand-icon">
+          <img src="./assets/isla-gaia-icon.svg" alt="Logótipo ISLA Gaia">
+        </div>
+        <div>
+          <div class="brand-name">CampusReserva</div>
+          <div class="brand-subtitle">ISLA Gaia · Gestão de espaços</div>
+        </div>
       </div>
+
       <div class="welcome-content">
         <span class="eyebrow">ISLA — Instituto Politécnico de Gestão e Tecnologia</span>
         <h1 id="welcome-title">O teu campus.<br>As tuas reservas.</h1>
         <p>Acede à plataforma de reserva de espaços e equipamentos do ISLA Gaia. Consulta disponibilidades e organiza as tuas atividades num só lugar.</p>
+
         <div class="features">
-          <div class="feature"><span class="feature-icon" aria-hidden="true">⌂</span><span>Consulta os espaços disponíveis</span></div>
-          <div class="feature"><span class="feature-icon" aria-hidden="true">◷</span><span>Organiza os teus horários</span></div>
-          <div class="feature"><span class="feature-icon" aria-hidden="true">✓</span><span>Gere as tuas reservas de forma simples</span></div>
+          <div class="feature">
+            <span class="feature-icon" aria-hidden="true">⌂</span>
+            <span>Consulta os espaços disponíveis</span>
+          </div>
+          <div class="feature">
+            <span class="feature-icon" aria-hidden="true">◷</span>
+            <span>Organiza os teus horários</span>
+          </div>
+          <div class="feature">
+            <span class="feature-icon" aria-hidden="true">✓</span>
+            <span>Gere as tuas reservas de forma simples</span>
+          </div>
         </div>
       </div>
+
       <div class="welcome-footer">CampusReserva · ISLA Gaia</div>
     </section>
 
-    <section class="login-panel" aria-labelledby="login-title">
+    <section class="login-panel" aria-label="Autenticação CampusReserva">
       <div class="login-card">
-        <div class="login-symbol" aria-hidden="true"><img src="./assets/isla-gaia-icon.svg" alt=""></div>
-        <h2 id="login-title">Bem-vindo de volta</h2>
-        <p class="login-description">Introduz as tuas credenciais para aceder à plataforma.</p>
-        <form class="login-form" id="loginForm" method="POST">
-          <div class="form-field">
-            <label for="email">Email institucional</label>
-            <input type="email" id="email" name="email" placeholder="nome@exemplo.pt" autocomplete="username" required>
+        <div class="login-symbol" aria-hidden="true">
+          <img src="./assets/isla-gaia-icon.svg" alt="">
+        </div>
+
+        <!-- Vista de início de sessão -->
+        <section id="loginView" class="auth-view" aria-labelledby="login-title">
+          <h2 id="login-title">Bem-vindo de volta</h2>
+          <p class="login-description">Introduz as tuas credenciais para aceder à plataforma.</p>
+
+          <form class="login-form" id="loginForm" method="post">
+            <div class="form-field">
+              <label for="email">Email institucional</label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                placeholder="nome@exemplo.pt"
+                autocomplete="username"
+                required
+              >
+            </div>
+
+            <div class="form-field">
+              <label for="password">Palavra-passe</label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                placeholder="Introduz a tua palavra-passe"
+                autocomplete="current-password"
+                required
+              >
+            </div>
+
+            <p id="errorMessage" class="error-message" role="alert" hidden aria-live="polite"></p>
+            <button class="login-button" id="loginBtn" type="submit">Entrar na plataforma</button>
+          </form>
+
+          <div class="auth-switch">
+            Ainda não tens conta?
+            <button class="text-button" id="showRegisterBtn" type="button">Criar conta</button>
           </div>
-          <div class="form-field">
-            <label for="password">Palavra-passe</label>
-            <input type="password" id="password" name="password" placeholder="Introduz a tua palavra-passe" autocomplete="current-password" required>
+        </section>
+
+        <!-- Vista de criação de conta -->
+        <section id="registerView" class="auth-view" aria-labelledby="register-title" hidden>
+          <h2 id="register-title">Criar conta</h2>
+          <p class="login-description">Preenche os teus dados para criares uma conta de utilizador no CampusReserva.</p>
+
+          <form class="login-form" id="registerForm" method="post">
+            <div class="form-field">
+              <label for="displayName">Nome completo</label>
+              <input
+                type="text"
+                id="displayName"
+                name="displayName"
+                placeholder="O teu nome completo"
+                autocomplete="name"
+                maxlength="100"
+                required
+              >
+            </div>
+
+            <div class="form-field">
+              <label for="registerEmail">Email</label>
+              <input
+                type="email"
+                id="registerEmail"
+                name="email"
+                placeholder="nome@exemplo.pt"
+                autocomplete="email"
+                required
+              >
+            </div>
+
+            <div class="form-field">
+              <label for="registerPassword">Palavra-passe</label>
+              <input
+                type="password"
+                id="registerPassword"
+                name="password"
+                placeholder="Pelo menos 6 caracteres"
+                autocomplete="new-password"
+                minlength="6"
+                required
+              >
+            </div>
+
+            <div class="form-field">
+              <label for="confirmPassword">Confirmar palavra-passe</label>
+              <input
+                type="password"
+                id="confirmPassword"
+                name="confirmPassword"
+                placeholder="Repete a palavra-passe"
+                autocomplete="new-password"
+                minlength="6"
+                required
+              >
+            </div>
+
+            <p id="registerErrorMessage" class="error-message" role="alert" hidden aria-live="polite"></p>
+            <button class="login-button" id="registerBtn" type="submit">Criar conta</button>
+          </form>
+
+          <div class="auth-switch">
+            Já tens conta?
+            <button class="text-button" id="showLoginBtn" type="button">Iniciar sessão</button>
           </div>
-          <p id="errorMessage" class="error-message" role="alert" hidden aria-live="polite"></p>
-          <button class="login-button" id="loginBtn" type="submit">Entrar na plataforma</button>
-        </form>
-        <div class="login-note"><strong>Acesso reservado</strong><br>Utiliza a conta criada para aceder ao CampusReserva.</div>
+        </section>
+
+        <div class="login-note">
+          <strong>Acesso reservado</strong><br>
+          Utiliza a tua conta para aceder à plataforma.
+        </div>
       </div>
     </section>
   </main>
