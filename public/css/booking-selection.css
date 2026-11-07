@@ -1,0 +1,76 @@
+/* Seleção interativa de intervalos na grelha de reservas CampusReserva. */
+.slot-button.slot-selected-range {
+  border-color: #d7aaa8;
+  background: #f7eeee;
+  color: var(--brand);
+  box-shadow: inset 0 0 0 1px rgba(118, 33, 35, .06);
+}
+
+.slot-button.slot-selected-start {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: #fff;
+  box-shadow: 0 5px 12px rgba(118, 33, 35, .2);
+}
+
+.slot-button.slot-selected-end {
+  border: 2px solid var(--brand);
+  background: #fff;
+  color: var(--brand);
+  box-shadow: 0 0 0 2px rgba(118, 33, 35, .09);
+}
+
+.slot-button.slot-selected-end.slot-occupied {
+  border-color: var(--brand);
+  background: #fff;
+  color: var(--brand);
+}
+
+.slot-button.slot-end-only {
+  border-style: dashed;
+  border-color: #c9bdba;
+  background: #faf8f7;
+  color: #6f6260;
+}
+
+.slot-button.slot-end-only:disabled {
+  cursor: not-allowed;
+}
+
+.legend-selected {
+  background: var(--brand);
+}
+
+.dialog-selection {
+  align-items: center;
+}
+
+.dialog-selection > div:first-child {
+  min-width: 0;
+}
+
+.dialog-selection > .dialog-selection-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.dialog-selection-actions .button {
+  white-space: nowrap;
+}
+
+@media (max-width: 650px) {
+  .dialog-selection {
+    align-items: stretch;
+  }
+
+  .dialog-selection > .dialog-selection-actions {
+    flex-direction: column-reverse;
+    width: 100%;
+  }
+
+  .dialog-selection-actions .button {
+    width: 100%;
+  }
+}

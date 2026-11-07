@@ -21,6 +21,8 @@ let managerReservationFilter = "todas";
 let editingResourceId = "";
 let selectedResourceId = "";
 let selectedReservationTime = "";
+let selectedReservationEndTime = "";
+let selectionRangeCompleted = false;
 let pendingCancellation = null;
 let slotRefreshSequence = 0;
 
@@ -304,6 +306,9 @@ function createReservationRow(reservation, managerMode) {
 
 // ---------------------- Modal de horários e disponibilidade ----------------------
 
+const SLOT_END_TIME = "22:00";
+const MAX_RESERVATION_MINUTES = 180;
+
 async function openResourceDialog(resourceId) {
   if (!currentUser) return;
   const resource = resources.find(item => item.id === resourceId && item.active === true);
@@ -311,16 +316,19 @@ async function openResourceDialog(resourceId) {
 
   selectedResourceId = resourceId;
   selectedReservationTime = "";
+  selectedReservationEndTime = "";
+  selectionRangeCompleted = false;
   dialogSlotLocks = [];
+
   $("#dialogResourceName").textContent = resource.name || "Recurso";
   $("#dialogResourceMeta").textContent = `${resource.type === "sala" ? "Sala" : "Equipamento eletrónico"}${resource.type === "sala" ? ` · ${resource.location || "Localização a definir"}` : ` · ${getResourceUnitCount(resource)} unidades`}${resource.type === "sala" && resource.capacity ? ` · ${resource.capacity} lugares` : ""}`;
   $("#dialogResourceSymbol").classList.toggle("equipment", resource.type !== "sala");
   $("#dialogResourceSymbol").textContent = resource.type === "sala" ? "▦" : "▣";
   $("#dialogDate").min = localDateString(new Date());
   $("#dialogDate").value = localDateString(new Date());
-  $("#dialogDuration").value = "30";
   $("#dialogError").hidden = true;
   updateSelectedSlotLabel();
+
   if (!$("#resourceDialog").open) $("#resourceDialog").showModal();
   await refreshDialogSlots();
 }
@@ -328,9 +336,11 @@ async function openResourceDialog(resourceId) {
 async function refreshDialogSlots() {
   const sequence = ++slotRefreshSequence;
   const date = $("#dialogDate").value;
-  const durationMinutes = Number($("#dialogDuration").value || 30);
   const grid = $("#slotGrid");
+
   selectedReservationTime = "";
+  selectedReservationEndTime = "";
+  selectionRangeCompleted = false;
   updateSelectedSlotLabel();
   $("#dialogError").hidden = true;
 
@@ -340,6 +350,7 @@ async function refreshDialogSlots() {
     $("#dialogAvailabilityMessage").textContent = "Escolhe uma data para consultar os horários.";
     return;
   }
+
   if (date < localDateString(new Date())) {
     grid.replaceChildren();
     $("#dialogAvailabilityMessage").textContent = "A data já passou. Escolhe hoje ou uma data futura.";
@@ -355,56 +366,65 @@ async function refreshDialogSlots() {
       where("resourceId", "==", selectedResourceId),
       where("date", "==", date)
     ));
+
     if (sequence !== slotRefreshSequence || date !== $("#dialogDate").value || !$("#resourceDialog").open) return;
 
     dialogSlotLocks = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
     let availableCount = 0;
 
-    grid.replaceChildren(...TIME_SLOTS.map(time => {
+    const buttons = [...TIME_SLOTS, SLOT_END_TIME].map(time => {
       const button = document.createElement("button");
       button.type = "button";
+      button.className = "slot-button";
       button.dataset.slotTime = time;
 
+      if (time === SLOT_END_TIME) {
+        button.classList.add("slot-end-only");
+        button.dataset.endOnly = "true";
+        button.dataset.statusLabel = "Limite de fim";
+        button.innerHTML = `<strong>${time}</strong><small>Fim do dia</small>`;
+        button.setAttribute("aria-label", `${time}, limite máximo do horário de funcionamento`);
+        button.disabled = isPastSlot(date, time);
+        return button;
+      }
+
       if (isPastSlot(date, time)) {
-        button.className = "slot-button slot-past";
+        button.classList.add("slot-past");
+        button.dataset.statusLabel = "Passado";
         button.innerHTML = `<strong>${time}</strong><small>Passado</small>`;
         button.disabled = true;
+        button.setAttribute("aria-label", `${time}, horário passado`);
         return button;
       }
 
-      const intervalTimes = getSlotTimesForDuration(time, durationMinutes);
-      if (!intervalTimes) {
-        button.className = "slot-button slot-past";
-        button.innerHTML = `<strong>${time}</strong><small>Fora do horário</small>`;
-        button.disabled = true;
-        return button;
-      }
+      // A disponibilidade base é sempre calculada por bloco de 30 minutos.
+      // A disponibilidade de um intervalo maior é verificada ao escolher a hora de fim.
+      const availableUnits = getAvailableUnitNumbers(resource, date, [time], dialogSlotLocks);
 
-      const availableUnits = getAvailableUnitNumbers(resource, date, intervalTimes, dialogSlotLocks);
       if (availableUnits.length > 0) {
         availableCount++;
-        button.className = "slot-button slot-free";
-        button.innerHTML = `<strong>${time}</strong><small>${resource.type === "equipamento" ? `${availableUnits.length} unid. livres` : "Disponível"}</small>`;
-        button.setAttribute("aria-label", `${time}, disponível durante ${formatDuration(durationMinutes)}`);
-        button.addEventListener("click", () => selectSlot(time));
+        button.classList.add("slot-free");
+        button.dataset.statusLabel = resource.type === "equipamento"
+          ? `${availableUnits.length} unid. livres`
+          : "Disponível";
+        button.innerHTML = `<strong>${time}</strong><small>${button.dataset.statusLabel}</small>`;
+        button.setAttribute("aria-label", `${time}, disponível durante 30 minutos`);
       } else {
-        button.className = "slot-button slot-occupied";
+        button.classList.add("slot-occupied");
+        button.dataset.statusLabel = "Ocupado";
         button.innerHTML = `<strong>${time}</strong><small>Ocupado</small>`;
-        button.setAttribute("aria-label", `${time}, ocupado durante ${formatDuration(durationMinutes)}`);
-        button.addEventListener("click", () => {
-          selectedReservationTime = "";
-          $$("#slotGrid .slot-button").forEach(slotButton => slotButton.classList.remove("slot-selected"));
-          updateSelectedSlotLabel();
-          $("#dialogError").textContent = `Não há disponibilidade entre ${time} e ${addMinutes(time, durationMinutes)}. Escolhe outro horário ou duração.`;
-          $("#dialogError").hidden = false;
-        });
+        button.setAttribute("aria-label", `${time}, ocupado como horário de início`);
       }
+
       return button;
-    }));
+    });
+
+    grid.replaceChildren(...buttons);
+    renderDialogSlotSelection();
 
     $("#dialogAvailabilityMessage").textContent = availableCount
-      ? `${availableCount} horários de início disponíveis para ${formatDuration(durationMinutes)}.`
-      : "Não existem intervalos livres para esta duração. Escolhe outra duração ou data.";
+      ? `${availableCount} horários de início disponíveis. Clica num horário para selecionar o início; podes reservar 30 minutos ou escolher uma segunda hora para definir o fim.`
+      : "Não existem horários de início livres nesta data. Escolhe outra data.";
   } catch (error) {
     console.error("Erro ao consultar a disponibilidade:", error);
     grid.innerHTML = '<div class="empty-state empty-state-wide"><strong>Não foi possível consultar os horários</strong>Confirma as regras de leitura de reservationSlots no Firestore.</div>';
@@ -413,28 +433,190 @@ async function refreshDialogSlots() {
 }
 
 function selectSlot(time) {
-  selectedReservationTime = time;
-  $$(".slot-button").forEach(button => button.classList.toggle("slot-selected", button.dataset.slotTime === time));
+  const resource = resources.find(item => item.id === selectedResourceId && item.active === true);
+  const date = $("#dialogDate").value;
+
+  if (!resource || !date) return;
+
+  // Depois de definir explicitamente um intervalo, o próximo clique inicia
+  // uma nova seleção em vez de alterar silenciosamente a reserva anterior.
+  if (!selectedReservationTime || selectionRangeCompleted) {
+    beginSlotSelection(time, resource, date);
+    return;
+  }
+
+  const startMinutes = clockMinutes(selectedReservationTime);
+  const clickedMinutes = clockMinutes(time);
+
+  if (time === SLOT_END_TIME && !selectedReservationTime) {
+    showDialogError("Seleciona primeiro uma hora de início.");
+    return;
+  }
+
+  if (clickedMinutes === startMinutes) {
+    return;
+  }
+
+  // Clicar antes do início reinicia a seleção a partir desse horário.
+  if (clickedMinutes < startMinutes) {
+    beginSlotSelection(time, resource, date);
+    return;
+  }
+
+  const durationMinutes = clickedMinutes - startMinutes;
+
+  if (durationMinutes < 30) {
+    showDialogError("A duração mínima de uma reserva é de 30 minutos.");
+    return;
+  }
+
+  if (durationMinutes > MAX_RESERVATION_MINUTES) {
+    showDialogError("A duração máxima permitida é de 3 horas. Escolhe uma hora de fim mais próxima.");
+    return;
+  }
+
+  const intervalTimes = getSlotTimesForRange(selectedReservationTime, time);
+  if (!intervalTimes) {
+    showDialogError("O intervalo selecionado não é válido. Escolhe horários de 30 em 30 minutos, até às 22:00.");
+    return;
+  }
+
+  const availableUnits = getAvailableUnitNumbers(resource, date, intervalTimes, dialogSlotLocks);
+  if (availableUnits.length === 0) {
+    showDialogError(`O intervalo ${selectedReservationTime}–${time} inclui pelo menos um bloco ocupado ou sem uma unidade disponível. Escolhe outra hora de fim.`);
+    return;
+  }
+
+  selectedReservationEndTime = time;
+  selectionRangeCompleted = true;
   $("#dialogError").hidden = true;
   updateSelectedSlotLabel();
 }
 
+function beginSlotSelection(time, resource, date) {
+  if (time === SLOT_END_TIME) {
+    showDialogError("22:00 é apenas o limite para terminar uma reserva. Escolhe primeiro uma hora de início.");
+    return;
+  }
+
+  if (!TIME_SLOTS.includes(time) || isPastSlot(date, time)) {
+    showDialogError("Escolhe um horário de início que ainda não tenha passado.");
+    return;
+  }
+
+  const defaultEndTime = addMinutes(time, 30);
+  const intervalTimes = getSlotTimesForRange(time, defaultEndTime);
+
+  if (!intervalTimes) {
+    showDialogError("Não é possível iniciar uma reserva neste horário. O funcionamento termina às 22:00.");
+    return;
+  }
+
+  const availableUnits = getAvailableUnitNumbers(resource, date, intervalTimes, dialogSlotLocks);
+  if (availableUnits.length === 0) {
+    showDialogError(`Não existe disponibilidade entre ${time} e ${defaultEndTime}. Escolhe outro horário de início.`);
+    return;
+  }
+
+  selectedReservationTime = time;
+  selectedReservationEndTime = defaultEndTime;
+  selectionRangeCompleted = false;
+  $("#dialogError").hidden = true;
+  updateSelectedSlotLabel();
+}
+
+function clearSlotSelection() {
+  selectedReservationTime = "";
+  selectedReservationEndTime = "";
+  selectionRangeCompleted = false;
+  $("#dialogError").hidden = true;
+  updateSelectedSlotLabel();
+  $("#dialogAvailabilityMessage").textContent = "Clica num horário disponível para definir o início. Sem uma segunda seleção, a reserva será de 30 minutos.";
+}
+
 function updateSelectedSlotLabel() {
-  const duration = Number($("#dialogDuration")?.value || 30);
-  $("#selectedSlotLabel").textContent = selectedReservationTime
-    ? `${selectedReservationTime} – ${addMinutes(selectedReservationTime, duration)} (${formatDuration(duration)})`
+  const hasSelection = Boolean(selectedReservationTime && selectedReservationEndTime);
+  const durationMinutes = hasSelection
+    ? clockMinutes(selectedReservationEndTime) - clockMinutes(selectedReservationTime)
+    : 0;
+
+  $("#selectedSlotLabel").textContent = hasSelection
+    ? `${selectedReservationTime} – ${selectedReservationEndTime} (${formatDuration(durationMinutes)})`
     : "Nenhum horário selecionado";
-  const button = $("#confirmReservationBtn");
-  button.disabled = !selectedReservationTime;
-  button.textContent = selectedReservationTime ? `Reservar ${selectedReservationTime}` : "Confirmar reserva";
+
+  const confirmButton = $("#confirmReservationBtn");
+  confirmButton.disabled = !hasSelection;
+  confirmButton.textContent = hasSelection
+    ? `Reservar ${formatDuration(durationMinutes)}`
+    : "Confirmar reserva";
+
+  const clearButton = $("#clearSlotSelection");
+  if (clearButton) clearButton.hidden = !hasSelection;
+
+  renderDialogSlotSelection();
+
+  if (hasSelection) {
+    $("#dialogAvailabilityMessage").textContent = selectionRangeCompleted
+      ? `Intervalo ${selectedReservationTime}–${selectedReservationEndTime} selecionado (${formatDuration(durationMinutes)}). Podes confirmar a reserva.`
+      : `Início ${selectedReservationTime} selecionado. A duração predefinida é de 30 minutos; clica numa hora posterior para escolher o fim (máximo de 3 horas).`;
+  }
+}
+
+function renderDialogSlotSelection() {
+  const hasSelection = Boolean(selectedReservationTime && selectedReservationEndTime);
+  const startMinutes = hasSelection ? clockMinutes(selectedReservationTime) : -1;
+  const endMinutes = hasSelection ? clockMinutes(selectedReservationEndTime) : -1;
+
+  $$("#slotGrid .slot-button").forEach(button => {
+    const time = button.dataset.slotTime;
+    const slotMinutes = clockMinutes(time);
+    const isStart = hasSelection && time === selectedReservationTime;
+    const isEnd = hasSelection && time === selectedReservationEndTime;
+    const isInsideRange = hasSelection && slotMinutes >= startMinutes && slotMinutes < endMinutes;
+
+    button.classList.toggle("slot-selected", isStart);
+    button.classList.toggle("slot-selected-start", isStart);
+    button.classList.toggle("slot-selected-range", isInsideRange && !isStart);
+    button.classList.toggle("slot-selected-end", isEnd);
+    button.setAttribute("aria-pressed", String(isInsideRange || isEnd));
+
+    const small = button.querySelector("small");
+    if (!small) return;
+
+    if (isStart) {
+      small.textContent = "Início";
+    } else if (isEnd) {
+      small.textContent = "Fim";
+    } else if (isInsideRange) {
+      small.textContent = "Incluído";
+    } else {
+      small.textContent = button.dataset.statusLabel || "Disponível";
+    }
+
+    if (button.dataset.endOnly === "true") {
+      button.disabled = isPastSlot($("#dialogDate").value, time) || !hasSelection || selectionRangeCompleted;
+    }
+  });
+}
+
+function showDialogError(message) {
+  $("#dialogError").textContent = message;
+  $("#dialogError").hidden = false;
 }
 
 $("#dialogDate").addEventListener("change", refreshDialogSlots);
-$("#dialogDuration").addEventListener("change", refreshDialogSlots);
+$("#clearSlotSelection").addEventListener("click", clearSlotSelection);
+$("#slotGrid").addEventListener("click", event => {
+  const button = event.target.closest("[data-slot-time]");
+  if (!button || button.disabled) return;
+  selectSlot(button.dataset.slotTime);
+});
+
 $("#closeResourceDialog").addEventListener("click", () => $("#resourceDialog").close());
 $("#resourceDialog").addEventListener("click", event => {
   if (event.target === $("#resourceDialog")) $("#resourceDialog").close();
 });
+
 ["#resourceGrid", "#homeResourceGrid"].forEach(selector => {
   $(selector).addEventListener("click", event => {
     const button = event.target.closest("[data-reserve-id]");
@@ -443,16 +625,25 @@ $("#resourceDialog").addEventListener("click", event => {
 });
 
 $("#confirmReservationBtn").addEventListener("click", async () => {
-  if (!currentUser || !selectedResourceId || !selectedReservationTime) return;
+  if (!currentUser || !selectedResourceId || !selectedReservationTime || !selectedReservationEndTime) return;
+
   const resource = resources.find(item => item.id === selectedResourceId && item.active === true);
   const date = $("#dialogDate").value;
   const startTime = selectedReservationTime;
-  const durationMinutes = Number($("#dialogDuration").value || 30);
-  const intervalTimes = getSlotTimesForDuration(startTime, durationMinutes);
+  const endTime = selectedReservationEndTime;
+  const durationMinutes = clockMinutes(endTime) - clockMinutes(startTime);
+  const intervalTimes = getSlotTimesForRange(startTime, endTime);
 
-  if (!resource || !isValidDateString(date) || date < localDateString(new Date()) || isPastSlot(date, startTime) || !intervalTimes) {
-    $("#dialogError").textContent = "Este intervalo já não pode ser reservado. Escolhe outra data ou horário.";
-    $("#dialogError").hidden = false;
+  if (
+    !resource ||
+    !isValidDateString(date) ||
+    date < localDateString(new Date()) ||
+    isPastSlot(date, startTime) ||
+    !intervalTimes ||
+    durationMinutes < 30 ||
+    durationMinutes > MAX_RESERVATION_MINUTES
+  ) {
+    showDialogError("Este intervalo já não pode ser reservado. Escolhe outra data ou horário.");
     return;
   }
 
@@ -467,12 +658,13 @@ $("#confirmReservationBtn").addEventListener("click", async () => {
       where("resourceId", "==", resource.id),
       where("date", "==", date)
     ));
+
     const latestLocks = freshSnapshot.docs.map(item => ({ id: item.id, ...item.data() }));
     const availableUnits = getAvailableUnitNumbers(resource, date, intervalTimes, latestLocks);
+
     if (availableUnits.length === 0) {
       await refreshDialogSlots();
-      $("#dialogError").textContent = "Este intervalo já não tem disponibilidade. Escolhe outro horário.";
-      $("#dialogError").hidden = false;
+      showDialogError("Este intervalo já não tem disponibilidade. A grelha foi atualizada; escolhe novamente os horários.");
       return;
     }
 
@@ -482,8 +674,8 @@ $("#confirmReservationBtn").addEventListener("click", async () => {
     const resourceRef = doc(db, "resources", resource.id);
     const reservationRef = doc(collection(db, "reservations"));
 
-    // Equipamentos criados antes da gestão por unidades podiam ter bloqueios antigos sem sufixo.
-    // Verifica também os IDs antigos para evitar sobreposição com uma reserva legada da unidade 1.
+    // Equipamentos antigos podiam ter bloqueios sem sufixo de unidade.
+    // Verifica os IDs legados da unidade 1 para evitar sobreposições.
     const legacyRefs = resource.type === "equipamento" && unitNumber === 1
       ? intervalTimes.map(time => doc(db, "reservationSlots", makeSlotId(resource.id, date, time)))
       : [];
@@ -496,6 +688,7 @@ $("#confirmReservationBtn").addEventListener("click", async () => {
       if (!resourceSnapshot.exists() || resourceSnapshot.data().active !== true) {
         throw new Error("RESOURCE_UNAVAILABLE");
       }
+
       if (lockSnapshots.some(snapshot => snapshot.exists())) {
         throw new Error("SLOT_ALREADY_BOOKED");
       }
@@ -512,7 +705,7 @@ $("#confirmReservationBtn").addEventListener("click", async () => {
         resourceType: latestResource.type,
         date,
         startTime,
-        endTime: addMinutes(startTime, durationMinutes),
+        endTime,
         durationMinutes,
         unitNumber,
         slotId: slotIds[0],
@@ -533,29 +726,32 @@ $("#confirmReservationBtn").addEventListener("click", async () => {
     });
 
     $("#resourceDialog").close();
-    showNotice(`Reserva criada: ${resource.name}, ${date}, ${startTime}–${addMinutes(startTime, durationMinutes)}${resource.type === "equipamento" ? ` (unidade ${unitNumber})` : ""}.`);
+    showNotice(`Reserva criada: ${resource.name}, ${date}, ${startTime}–${endTime}${resource.type === "equipamento" ? ` (unidade ${unitNumber})` : ""}.`);
     await loadData();
   } catch (error) {
     console.error("Erro ao criar reserva:", error);
+
     if (error.message === "SLOT_ALREADY_BOOKED") {
       await refreshDialogSlots();
-      $("#dialogError").textContent = "Outra pessoa acabou de reservar este intervalo ou unidade. A disponibilidade foi atualizada; escolhe outro horário.";
+      showDialogError("Outra pessoa acabou de reservar este intervalo ou unidade. A disponibilidade foi atualizada; escolhe novamente os horários.");
     } else if (error.message === "RESOURCE_UNAVAILABLE" || error.message === "RESOURCE_CAPACITY_CHANGED") {
-      $("#dialogError").textContent = "O recurso foi alterado ou desativado pelo gestor. Atualiza a disponibilidade.";
+      showDialogError("O recurso foi alterado ou desativado pelo gestor. Atualiza a disponibilidade.");
       await loadData();
     } else if (error.code === "permission-denied") {
-      $("#dialogError").textContent = "A reserva foi bloqueada pelas regras do Firestore. Confirma que as regras atualizadas foram publicadas.";
+      showDialogError("A reserva foi bloqueada pelas regras do Firestore. Confirma que as regras atualizadas foram publicadas.");
     } else {
-      $("#dialogError").textContent = "Não foi possível criar a reserva. Atualiza os horários e tenta novamente.";
+      showDialogError("Não foi possível criar a reserva. Atualiza os horários e tenta novamente.");
     }
-    $("#dialogError").hidden = false;
   } finally {
-    confirmButton.textContent = selectedReservationTime ? `Reservar ${selectedReservationTime}` : "Confirmar reserva";
-    confirmButton.disabled = !selectedReservationTime;
+    confirmButton.textContent = selectedReservationTime && selectedReservationEndTime
+      ? `Reservar ${formatDuration(clockMinutes(selectedReservationEndTime) - clockMinutes(selectedReservationTime))}`
+      : "Confirmar reserva";
+    confirmButton.disabled = !(selectedReservationTime && selectedReservationEndTime);
   }
 });
 
 // ---------------------- Cancelamento com popup ----------------------
+
 
 $("#userReservationsList").addEventListener("click", event => handleCancelClick(event, false));
 $("#managerReservationsList").addEventListener("click", event => handleCancelClick(event, true));
@@ -984,14 +1180,35 @@ function getAvailableUnitNumbers(resource, date, times, locks) {
   return freeUnits;
 }
 
-function getSlotTimesForDuration(startTime, durationMinutes) {
-  if (![30, 60, 90, 120, 150, 180].includes(durationMinutes)) return null;
-  const startIndex = TIME_SLOTS.indexOf(startTime);
-  if (startIndex < 0) return null;
-  const count = durationMinutes / 30;
-  const times = TIME_SLOTS.slice(startIndex, startIndex + count);
-  if (times.length !== count || addMinutes(startTime, durationMinutes) > "22:00") return null;
-  return times;
+function clockMinutes(time) {
+  const [hours, minutes] = String(time).split(":").map(Number);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return NaN;
+  return hours * 60 + minutes;
+}
+
+function getSlotTimesForRange(startTime, endTime) {
+  if (!TIME_SLOTS.includes(startTime)) return null;
+
+  const startMinutes = clockMinutes(startTime);
+  const endMinutes = clockMinutes(endTime);
+  const durationMinutes = endMinutes - startMinutes;
+
+  if (
+    !Number.isInteger(durationMinutes) ||
+    ![30, 60, 90, 120, 150, 180].includes(durationMinutes) ||
+    endMinutes > clockMinutes("22:00")
+  ) {
+    return null;
+  }
+
+  const times = [];
+  for (let minutes = startMinutes; minutes < endMinutes; minutes += 30) {
+    const time = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+    if (!TIME_SLOTS.includes(time)) return null;
+    times.push(time);
+  }
+
+  return times.length === durationMinutes / 30 ? times : null;
 }
 
 function getNextBookableTime() {

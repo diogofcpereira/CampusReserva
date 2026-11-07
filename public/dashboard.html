@@ -6,6 +6,7 @@
   <meta name="description" content="CampusReserva — reserva de salas e equipamentos do ISLA Gaia.">
   <title>CampusReserva | Área reservada</title>
   <link rel="stylesheet" href="./css/dashboard.css">
+  <link rel="stylesheet" href="./css/booking-selection.css">
   <script type="module">
     import("./js/dashboard.js").catch((error) => {
       console.error("Não foi possível iniciar o CampusReserva:", error);
@@ -65,7 +66,7 @@
               <article class="stat-card"><div class="stat-icon stat-icon-grey">▣</div><div><strong id="userStatEquipment">0</strong><p>Unidades de equipamento livres</p></div></article>
             </div>
             <section class="resource-home-section">
-              <div class="section-heading"><div><h2>Salas e equipamentos</h2><p>Seleciona um recurso, escolhe a duração e consulta os horários disponíveis.</p></div><button class="text-button" type="button" data-go-view="resources">Ver catálogo completo →</button></div>
+              <div class="section-heading"><div><h2>Salas e equipamentos</h2><p>Seleciona um recurso e escolhe diretamente o início e o fim da reserva.</p></div><button class="text-button" type="button" data-go-view="resources">Ver catálogo completo →</button></div>
               <div id="homeResourceGrid" class="resource-grid"></div>
             </section>
             <section class="panel upcoming-panel"><div class="panel-heading"><div><h2>Próximas reservas</h2><p>Os teus horários agendados.</p></div><button class="text-button" type="button" data-go-view="reservations">Ver todas →</button></div><div id="userHomeReservations" class="compact-list"></div></section>
@@ -89,7 +90,7 @@
         </section>
 
         <section class="page-view" id="view-resources" aria-labelledby="resourcesTitle" hidden>
-          <div class="section-heading"><div><span class="eyebrow">CATÁLOGO DO CAMPUS</span><h2 id="resourcesTitle">Salas e equipamentos</h2><p>Escolhe a duração da reserva. Os intervalos ocupados aparecem a vermelho.</p></div></div>
+          <div class="section-heading"><div><span class="eyebrow">CATÁLOGO DO CAMPUS</span><h2 id="resourcesTitle">Salas e equipamentos</h2><p>Clica numa hora para definir o início e numa segunda hora para definir o fim. Os intervalos ocupados aparecem a vermelho.</p></div></div>
           <div class="filter-row" role="group" aria-label="Filtrar recursos">
             <button class="filter-button active" type="button" data-filter="todos">Todos</button>
             <button class="filter-button" type="button" data-filter="sala">Salas</button>
@@ -148,13 +149,26 @@
     <div class="dialog-header"><div class="dialog-resource-heading"><span class="resource-symbol" id="dialogResourceSymbol" aria-hidden="true">▦</span><div><span class="eyebrow">CONSULTAR DISPONIBILIDADE</span><h2 id="dialogResourceName">Recurso</h2><p id="dialogResourceMeta">Localização</p></div></div><button class="dialog-close" type="button" id="closeResourceDialog" aria-label="Fechar">×</button></div>
     <div class="dialog-content">
       <div class="dialog-date-field"><label for="dialogDate">Data da reserva</label><input type="date" id="dialogDate" required></div>
-      <div class="dialog-date-field"><label for="dialogDuration">Duração da reserva</label><select id="dialogDuration" required><option value="30" selected>30 minutos</option><option value="60">1 hora</option><option value="90">1 hora e 30 minutos</option><option value="120">2 horas</option><option value="150">2 horas e 30 minutos</option><option value="180">3 horas</option></select></div>
-      <div class="slot-legend"><span><i class="legend-dot legend-free"></i>Disponível</span><span><i class="legend-dot legend-occupied"></i>Ocupado</span><span><i class="legend-dot legend-past"></i>Passado / fora do horário</span></div>
+      <div class="slot-legend">
+        <span><i class="legend-dot legend-free"></i>Disponível</span>
+        <span><i class="legend-dot legend-occupied"></i>Ocupado</span>
+        <span><i class="legend-dot legend-past"></i>Passado</span>
+        <span><i class="legend-dot legend-selected"></i>Intervalo selecionado</span>
+      </div>
       <p class="availability-message" id="dialogAvailabilityMessage" role="status" aria-live="polite">A consultar horários...</p>
-      <div class="slot-grid" id="slotGrid" aria-label="Horários de início em intervalos de 30 minutos"></div>
+      <div class="slot-grid" id="slotGrid" aria-label="Horários em intervalos de 30 minutos; seleciona uma hora de início e uma hora de fim"></div>
       <p class="dialog-error" id="dialogError" role="alert" hidden></p>
-      <div class="dialog-selection"><div><small>HORÁRIO SELECIONADO</small><strong id="selectedSlotLabel">Nenhum horário selecionado</strong></div><button class="button button-primary" type="button" id="confirmReservationBtn" disabled>Confirmar reserva</button></div>
-      <p class="dialog-footnote">Cada reserva pode durar entre 30 minutos e 3 horas. Os horários são bloqueados em intervalos de 30 minutos.</p>
+      <div class="dialog-selection">
+        <div>
+          <small>INTERVALO SELECIONADO</small>
+          <strong id="selectedSlotLabel">Nenhum horário selecionado</strong>
+        </div>
+        <div class="dialog-selection-actions">
+          <button class="button button-secondary" type="button" id="clearSlotSelection" hidden>Limpar</button>
+          <button class="button button-primary" type="button" id="confirmReservationBtn" disabled>Confirmar reserva</button>
+        </div>
+      </div>
+      <p class="dialog-footnote">Uma reserva dura entre 30 minutos e 3 horas. O primeiro clique seleciona o início e reserva 30 minutos por defeito; o segundo define a hora de fim. Cada bloco corresponde a 30 minutos e o horário de funcionamento termina às 22:00. A hora de fim não está incluída na reserva (por exemplo, 09:00–11:00 reserva até às 11:00).</p>
     </div>
   </dialog>
 
