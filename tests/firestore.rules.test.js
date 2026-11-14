@@ -14,7 +14,10 @@ import {
   query, where, writeBatch, serverTimestamp,
 } from "firebase/firestore";
 
-const DIA = "2026-11-20";
+// Datas relativas ao dia em que os testes correm (em UTC), em vez de uma data fixa
+// que um dia passa a estar no passado.
+const emDias = (n) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+const DIA = emDias(7);
 let env;
 
 before(async () => {
@@ -67,9 +70,9 @@ function reservar(db, uid, opcoes = {}, { semBloqueios = 0 } = {}) {
 }
 
 // Cancela: muda o estado e apaga TODOS os bloqueios na mesma operação.
-function cancelar(db, reservationId, slotIds, { manterBloqueios = 0 } = {}) {
+function cancelar(db, reservationId, slotIds, { manterBloqueios = 0, extra = {} } = {}) {
   const batch = writeBatch(db);
-  batch.update(doc(db, "reservations", reservationId), { status: "cancelada", cancelledAt: serverTimestamp() });
+  batch.update(doc(db, "reservations", reservationId), { status: "cancelada", cancelledAt: serverTimestamp(), ...extra });
   slotIds.slice(0, slotIds.length - manterBloqueios).forEach((id) => batch.delete(doc(db, "reservationSlots", id)));
   return batch.commit();
 }
@@ -304,7 +307,15 @@ describe("Reservas", () => {
   });
 
   test("data inexistente é recusada", async () => {
-    await assertFails(reservar(como("rui"), "rui", { date: "2026-02-30" }));
+    await assertFails(reservar(como("rui"), "rui", { date: `${Number(DIA.slice(0, 4)) + 1}-02-30` }));
+  });
+
+  test("dia que já passou é recusado", async () => {
+    await assertFails(reservar(como("rui"), "rui", { date: emDias(-1) }));
+  });
+
+  test("hoje ainda é reservável", async () => {
+    await assertSucceeds(reservar(como("rui"), "rui", { date: emDias(0), startTime: "21:30" }));
   });
 
   test("recurso desativado não é reservável", async () => {
@@ -373,5 +384,69 @@ describe("Reservas", () => {
 
   test("ninguém apaga reservas (mantém-se o histórico)", async () => {
     await assertFails(deleteDoc(doc(como("gestor1"), "reservations/resAna")));
+  });
+});
+
+// ---------- Desativar um recurso com reservas futuras ----------
+// O gestor desativa o recurso e cancela as reservas futuras na mesma operação atómica,
+// tal como faz o dashboard.js. Cada reserva cancelada guarda quem cancelou e porquê.
+describe("Desativar recurso", () => {
+  const motivo = (uid, cancelReason) => ({ cancelledBy: uid, cancelReason });
+
+  function desativarECancelar(db, resourceId, reservas) {
+    const batch = writeBatch(db);
+    batch.update(doc(db, "resources", resourceId), { active: false, updatedAt: serverTimestamp() });
+    for (const r of reservas) {
+      batch.update(doc(db, "reservations", r.reservationId), {
+        status: "cancelada", cancelledAt: serverTimestamp(), ...motivo("gestor1", "recurso_desativado"),
+      });
+      r.reservation.slotIds.forEach((id) => batch.delete(doc(db, "reservationSlots", id)));
+    }
+    return batch.commit();
+  }
+
+  test("gestor desativa o recurso e cancela as reservas futuras no mesmo batch", async () => {
+    const rui = dadosReserva("rui", { startTime: "14:00", minutes: 180 });
+    await assertSucceeds(reservar(como("rui"), "rui", { startTime: "14:00", minutes: 180 }));
+    await assertSucceeds(desativarECancelar(como("gestor1"), "sala1", [{ reservationId: "resAna", reservation: ANA.reservation }, rui]));
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const depois = (await getDoc(doc(ctx.firestore(), "reservations/resAna"))).data();
+      if (depois.status !== "cancelada" || depois.cancelReason !== "recurso_desativado") throw new Error("a reserva não ficou cancelada");
+    });
+  });
+
+  test("o horário fica livre e o recurso deixa de aceitar reservas", async () => {
+    await assertSucceeds(desativarECancelar(como("gestor1"), "sala1", [{ reservationId: "resAna", reservation: ANA.reservation }]));
+    await assertFails(reservar(como("rui"), "rui", { startTime: "10:00" }));
+  });
+
+  test("motivo 'recurso_desativado' com o recurso ainda ativo é recusado", async () => {
+    await assertFails(cancelar(como("gestor1"), "resAna", ANA.reservation.slotIds, { extra: motivo("gestor1", "recurso_desativado") }));
+  });
+
+  test("utilizador não pode usar o motivo 'recurso_desativado'", async () => {
+    await env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), "resources/sala1"), { active: false }));
+    await assertFails(cancelar(como("ana"), "resAna", ANA.reservation.slotIds, { extra: motivo("ana", "recurso_desativado") }));
+  });
+
+  test("utilizador cancela com o motivo 'utilizador'", async () => {
+    await assertSucceeds(cancelar(como("ana"), "resAna", ANA.reservation.slotIds, { extra: motivo("ana", "utilizador") }));
+  });
+
+  test("motivo 'gestor' só por um gestor", async () => {
+    await assertFails(cancelar(como("ana"), "resAna", ANA.reservation.slotIds, { extra: motivo("ana", "gestor") }));
+    await assertSucceeds(cancelar(como("gestor1"), "resAna", ANA.reservation.slotIds, { extra: motivo("gestor1", "gestor") }));
+  });
+
+  test("cancelledBy tem de ser quem cancela", async () => {
+    await assertFails(cancelar(como("ana"), "resAna", ANA.reservation.slotIds, { extra: motivo("gestor1", "utilizador") }));
+  });
+
+  test("motivo desconhecido é recusado", async () => {
+    await assertFails(cancelar(como("ana"), "resAna", ANA.reservation.slotIds, { extra: motivo("ana", "porque sim") }));
+  });
+
+  test("desativar sem cancelar as reservas continua permitido (o gestor decide)", async () => {
+    await assertSucceeds(updateDoc(doc(como("gestor1"), "resources/sala1"), { active: false, updatedAt: serverTimestamp() }));
   });
 });
