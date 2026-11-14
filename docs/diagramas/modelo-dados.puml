@@ -14,7 +14,7 @@ class "users" as User <<coleção>> {
   uid : string
   email : string
   displayName : string
-  role : "utilizador" ou "gestor"
+  role : string
   createdAt : timestamp
   updatedAt : timestamp
 }
@@ -22,10 +22,10 @@ class "users" as User <<coleção>> {
 class "resources" as Resource <<coleção>> {
   ID do documento: gerado pelo Firestore
   --
-  name : string, 1 a 90 caracteres
-  type : "sala" ou "equipamento"
-  location : string, vazio nos equipamentos
-  capacity : inteiro de 1 a 1000, ou null
+  name : string
+  type : string
+  location : string
+  capacity : int
   description : string
   active : boolean
   createdAt : timestamp
@@ -49,9 +49,9 @@ class "reservations" as Reservation <<coleção>> {
   status : "ativa" ou "cancelada"
   createdAt : timestamp
   .. só depois de cancelada ..
-  cancelledAt : timestamp, hora do servidor
-  cancelledBy : string, UID de quem cancelou
-  cancelReason : "utilizador", "gestor"
+  cancelledAt : timestamp
+  cancelledBy : string
+  cancelReason : string
   ou "recurso_desativado"
 }
 
@@ -60,8 +60,8 @@ class "reservationSlots" as Slot <<coleção>> {
   --
   reservationId : string
   resourceId : string
-  date : string AAAA-MM-DD
-  startTime : string HH:MM
+  date : string
+  startTime : string
   unitNumber : inteiro
 }
 
@@ -77,33 +77,7 @@ note right of Resource
   num equipamento, o número de unidades,
   cada uma reservável em separado.
   Desativar um recurso cancela as suas reservas
-  por realizar (cancelReason "recurso_desativado").
+  por realizar.
 end note
 
-note right of Reservation
-  cancelReason:
-  "utilizador" só pelo dono da reserva;
-  "gestor" só por um gestor;
-  "recurso_desativado" só por um gestor e só
-  se o recurso ficar desativado na mesma operação.
-end note
-
-note bottom of Slot
-  Um bloqueio por cada meia hora de uma reserva ativa:
-  de 1 a 6 enquanto está ativa, nenhum depois de cancelada.
-  Composição do ID:
-  sala: resourceId_date_HH:MM
-  equipamento: resourceId_date_HH:MM_unit_n
-  Exemplo: sala1_2026-11-20_10:00
-  Um bloqueio nunca é atualizado: cria-se com a reserva
-  e apaga-se quando ela é cancelada.
-end note
-
-legend
-  O Firestore não tem chaves estrangeiras: as ligações são IDs guardados em campos.
-  Perfis, recursos e reservas nunca são apagados; os recursos desativam-se e as reservas cancelam-se.
-  Dados antigos ainda aceites pelo código e pelas regras: reservas só com slotId (sem slotIds),
-  bloqueios de equipamento sem o sufixo _unit_n, recursos sem createdAt
-  e equipamentos sem capacity (contam como 1 unidade).
-endlegend
 @enduml
