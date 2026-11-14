@@ -80,6 +80,11 @@
                 autocomplete="current-password"
                 required
               >
+              <div class="password-actions">
+                <button class="text-button forgot-password-button" id="showPasswordResetBtn" type="button">
+                  Esqueceste-te da palavra-passe?
+                </button>
+              </div>
             </div>
 
             <p id="errorMessage" class="error-message" role="alert" hidden aria-live="polite"></p>
@@ -89,6 +94,38 @@
           <div class="auth-switch">
             Ainda não tens conta?
             <button class="text-button" id="showRegisterBtn" type="button">Criar conta</button>
+          </div>
+        </section>
+
+        <!-- Vista de recuperação da palavra-passe -->
+        <section id="passwordResetView" class="auth-view" aria-labelledby="password-reset-title" hidden>
+          <h2 id="password-reset-title">Recuperar palavra-passe</h2>
+          <p class="login-description">
+            Introduz o email associado à tua conta. Se existir uma conta com esse endereço,
+            receberás uma ligação para definires uma nova palavra-passe.
+          </p>
+
+          <form class="login-form" id="passwordResetForm" method="post">
+            <div class="form-field">
+              <label for="resetEmail">Email associado à conta</label>
+              <input
+                type="email"
+                id="resetEmail"
+                name="email"
+                placeholder="nome@exemplo.pt"
+                autocomplete="email"
+                required
+              >
+            </div>
+
+            <p id="passwordResetErrorMessage" class="error-message" role="alert" hidden aria-live="polite"></p>
+            <p id="passwordResetSuccessMessage" class="success-message" role="status" hidden aria-live="polite"></p>
+            <button class="login-button" id="passwordResetBtn" type="submit">Enviar ligação de recuperação</button>
+          </form>
+
+          <div class="auth-switch">
+            Já te lembras da palavra-passe?
+            <button class="text-button" id="backToLoginBtn" type="button">Voltar ao início de sessão</button>
           </div>
         </section>
 

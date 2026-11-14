@@ -252,6 +252,18 @@ input {
   box-shadow: 0 0 0 4px rgba(118, 33, 35, .12);
 }
 
+.password-actions {
+  display: flex;
+  justify-content: right;
+  margin-top: -2px;
+  font-size: 13px;
+}
+
+.forgot-password-button {
+  padding: 0;
+  text-align: right;
+}
+
 .login-button {
   width: 100%;
   min-height: 50px;
@@ -295,6 +307,21 @@ input {
 }
 
 .error-message[hidden] {
+  display: none;
+}
+
+.success-message {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #b7dfc4;
+  border-radius: 10px;
+  background: #f0faf3;
+  color: #216e39;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.success-message[hidden] {
   display: none;
 }
 
