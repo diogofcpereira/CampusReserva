@@ -1,0 +1,54 @@
+@startuml sequencia-desativacao
+
+title CampusReserva: desativar um recurso com reservas por realizar
+
+skinparam monochrome true
+skinparam shadowing false
+autonumber
+
+actor "Gestor" as G
+participant "Browser\n(dashboard.js)" as B
+participant "Security Rules\n(firestore.rules)" as R
+database "Cloud Firestore" as F
+
+G -> B : Clica em "Desativar" num recurso ativo
+B -> F : Lê as reservas ativas desse recurso
+F --> B : Reservas ativas
+B -> B : Fica com as que ainda não terminaram
+
+alt Não há reservas por realizar
+  B -> R : Atualiza o recurso: active = false
+  R -> F : Grava (é gestor)
+  B --> G : "Recurso desativado. Não tinha reservas por realizar."
+else Há reservas por realizar
+  B --> G : Janela com a lista das reservas a cancelar
+  G -> B : "Desativar e cancelar reservas"
+  B -> B : Divide as reservas em lotes de até 16 documentos\n(uma reserva fica sempre no mesmo lote que os seus bloqueios)
+
+  loop Para cada lote (uma transação por lote)
+    B -> F : Lê cada reserva e os seus bloqueios
+    F --> B : Estado atual
+    B -> R : Grava em conjunto:\nno primeiro lote, o recurso com active = false;\ncada reserva ainda ativa passa a "cancelada"\ncom cancelReason "recurso_desativado";\nos seus bloqueios são apagados
+    note over R
+      Cancelar: só muda status, cancelledAt (hora do servidor),
+      cancelledBy (quem pede) e cancelReason.
+      "recurso_desativado" exige um gestor e o recurso
+      desativado no fim da operação (getAfter).
+      Todos os bloqueios da reserva deixam de existir (existsAfter).
+    end note
+    R -> F : Grava o lote
+    F --> B : Confirmado
+  end
+
+  B -> F : Recarrega os dados do painel (loadData)
+  B --> G : "Recurso desativado. N reservas foram canceladas."
+end
+
+note over B, F
+  Se um lote falhar depois do primeiro, o recurso já está desativado:
+  o gestor vê quantas foram canceladas e pode tentar novamente
+  só com as que faltam, ou cancelá-las em "Gerir reservas".
+  Cada utilizador vê a reserva como
+  "Cancelada pelo gestor: o recurso foi desativado".
+end note
+@enduml

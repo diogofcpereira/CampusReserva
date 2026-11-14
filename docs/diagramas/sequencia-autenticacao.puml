@@ -1,0 +1,75 @@
+@startuml sequencia-autenticacao
+
+title CampusReserva: criar conta, iniciar sessão e carregar o perfil
+
+skinparam monochrome true
+skinparam shadowing false
+autonumber
+
+actor "Pessoa" as P
+participant "Browser\n(index.js e dashboard.js)" as B
+participant "Firebase\nAuthentication" as A
+participant "Security Rules\n(firestore.rules)" as R
+database "Cloud Firestore" as F
+
+== Criar conta (index.js) ==
+
+P -> B : Nome, email e palavra-passe (duas vezes)
+B -> B : Valida no browser: nome preenchido,\npalavras-passe iguais, pelo menos 6 caracteres
+B -> A : createUserWithEmailAndPassword
+A --> B : Conta criada, com UID, e sessão iniciada
+B -> R : Cria o perfil no documento users/UID\ncom role "utilizador"
+
+note over R
+  O ID do documento é o UID de quem pede;
+  o email é o da conta;
+  role só pode ser "utilizador";
+  só os campos previstos.
+end note
+
+alt O perfil cumpre as regras
+  R -> F : Grava o perfil
+  F --> B : Confirmado
+  B --> P : Abre o painel (dashboard.html)
+else A gravação do perfil falha (regras ou ligação)
+  R --> B : Erro (por exemplo, permission-denied)
+  B -> A : Elimina a conta acabada de criar (deleteUser)
+  alt Conta eliminada
+    B --> P : Mensagem de erro: a criação foi revertida
+  else Não foi possível eliminar a conta
+    B -> A : Termina a sessão (signOut)
+    B --> P : Mensagem de erro: a conta ficou sem perfil
+  end
+end
+
+== Iniciar sessão (index.js) ==
+
+P -> B : Email e palavra-passe
+B -> A : signInWithEmailAndPassword
+A --> B : Sessão iniciada
+B --> P : Abre o painel (dashboard.html)
+
+== Entrar no painel (dashboard.js) ==
+
+B -> A : Há sessão? (onAuthStateChanged)
+
+alt Sem sessão
+  A --> B : Não
+  B --> P : Volta à página de início de sessão
+else Com sessão
+  A --> B : Sim, com o UID
+  B -> R : Lê o perfil users/UID
+  R -> F : Permitido: é o próprio perfil
+  F --> B : Perfil com o papel (role)
+  B -> B : Mostra o menu de utilizador ou o de gestor\n(só o valor "gestor" ativa a gestão)
+  B -> R : Carrega os dados (loadData)
+  R -> F : Permitido conforme o papel
+  F --> B : Utilizador: recursos ativos e as suas reservas\nGestor: todos os recursos, perfis e as reservas\ndos últimos 30 dias e futuras\nAmbos: bloqueios de hoje
+end
+
+note over R, F
+  Esconder o menu de gestão é só interface. Em cada pedido,
+  as regras voltam a ler users/UID para confirmar o papel (isManager).
+  Uma conta sem perfil é tratada como utilizador.
+end note
+@enduml

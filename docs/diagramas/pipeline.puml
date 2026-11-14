@@ -1,0 +1,69 @@
+@startuml pipeline
+
+title CampusReserva: deploy automático com GitHub Actions
+
+skinparam monochrome true
+skinparam shadowing false
+
+start
+:Alteração ao código;
+
+if (Como chega ao GitHub?) then (push ou merge para main)
+  :Job 1 - Testar Security Rules
+  npm ci
+  npm run test:regras, no emulador do Firestore;
+  note right
+    Workflow firebase-hosting-merge.yml
+  end note
+
+  if (Os testes passam?) then (sim)
+    :Job 2 - Publicar Security Rules
+    autentica-se com a conta de serviço
+    publica o firestore.rules no projeto campusreservage;
+    note right
+      As regras são publicadas antes da aplicação,
+      para que uma versão nova no canal live nunca
+      corra contra regras antigas.
+    end note
+    if (As regras foram publicadas?) then (sim)
+      :Job 3 - Publicar no Hosting
+      publica a pasta public/ no canal live;
+      :Produção atualizada
+      campusreservage.web.app;
+    else (não)
+      :Execução a vermelho
+      A aplicação não é publicada;
+    endif
+  else (não)
+    :Execução a vermelho
+    Nada é publicado;
+  endif
+
+else (pull request)
+  :Job 1 - Testar Security Rules
+  os mesmos testes;
+  note right
+    Workflow firebase-hosting-pull-request.yml
+  end note
+
+  if (Os testes passam?) then (sim)
+    if (O PR vem do próprio repositório?) then (sim)
+      :Job 2 - Pré-visualização
+      URL temporário, comentado no pull request;
+      note right
+        As regras não são publicadas: a pré-visualização
+        usa os dados reais e as regras de produção,
+        que podem ser mais antigas do que as do PR.
+      end note
+    else (não, vem de um fork)
+      :Sem pré-visualização
+      (o job é ignorado);
+    endif
+  else (não)
+    :Execução a vermelho
+    Sem pré-visualização;
+  endif
+endif
+
+stop
+@enduml

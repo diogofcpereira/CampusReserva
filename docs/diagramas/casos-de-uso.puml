@@ -1,0 +1,54 @@
+@startuml casos-de-uso
+
+title CampusReserva: casos de uso por perfil de utilizador
+
+skinparam monochrome true
+skinparam shadowing false
+left to right direction
+
+actor "Visitante\nsem sessão" as V
+actor "Utilizador" as U
+actor "Gestor" as G
+
+rectangle "CampusReserva" {
+  usecase "Criar conta" as UC1
+  usecase "Iniciar sessão" as UC2
+  usecase "Consultar recursos ativos\ne a sua disponibilidade" as UC3
+  usecase "Reservar sala ou equipamentos" as UC4
+  usecase "Consultar as próprias reservas" as UC5
+  usecase "Cancelar as suas reservas\nque ainda não começaram" as UC6
+  usecase "Criar e editar recursos" as UC7
+  usecase "Ativar e desativar recursos" as UC8
+  usecase "Cancelar as reservas por realizar\ndo recurso desativado" as UC11
+  usecase "Consultar e cancelar as reservas de todos" as UC9
+  usecase "Promover e despromover\noutros utilizadores" as UC10
+}
+
+V --> UC1
+V --> UC2
+
+U --> UC3
+U --> UC4
+U --> UC5
+U --> UC6
+
+G --> UC3
+G --> UC4
+G --> UC7
+G --> UC8
+G --> UC9
+G --> UC10
+
+UC11 .> UC8 : <<extend>>\nse houver reservas\npor realizar
+
+note right of G
+  O gestor também reserva, mas não tem a vista
+  "As minhas reservas": vê as suas em "Gerir reservas",
+  junto com as de todos, e pode cancelar qualquer uma.
+  Uma conta nova é sempre criada como utilizador.
+  O primeiro gestor é definido na consola Firebase;
+  os seguintes são promovidos na aplicação.
+  Ninguém altera o seu próprio papel.
+end note
+
+@enduml

@@ -1,0 +1,62 @@
+@startuml sequencia-concorrencia
+
+title CampusReserva: dois pedidos para o mesmo horário
+
+skinparam monochrome true
+skinparam shadowing false
+autonumber
+
+actor "Utilizador A" as A
+actor "Utilizador B" as B
+participant "Cloud Firestore\ne Security Rules" as F
+actor "Pedido direto à API\nsem usar a aplicação" as X
+
+note over A, B
+  Ambos veem a sala livre às 10:00 e confirmam quase ao mesmo tempo.
+  O bloqueio desse horário tem sempre o mesmo ID:
+  sala1_2026-11-20_10:00
+end note
+
+== Primeira barreira: a transação ==
+
+A -> F : A transação A lê o bloqueio
+F --> A : Não existe
+B -> F : A transação B lê o mesmo bloqueio
+F --> B : Não existe
+A -> F : Grava a reserva A e o bloqueio
+F --> A : Confirmado
+
+note right of F
+  O bloqueio passa a existir
+  e aponta para a reserva A.
+end note
+
+B -> F : Grava a reserva B e o mesmo bloqueio
+F --> B : Rejeitado: o bloqueio lido mudou entretanto
+B -> F : O SDK repete a transação B\ne volta a ler o bloqueio
+F --> B : Já existe
+B -> B : dashboard.js interrompe a transação\ncom o erro SLOT_ALREADY_BOOKED
+
+note over B
+  Nada é gravado. O utilizador B lê a mensagem
+  "Outra pessoa acabou de reservar este intervalo ou unidade"
+  e a grelha é atualizada.
+end note
+
+== Segunda barreira: as regras ==
+
+X -> F : Tenta gravar uma reserva e escrever\npor cima do bloqueio que já existe
+F --> X : permission-denied
+
+note over F, X
+  Escrever sobre um documento que já existe é uma atualização,
+  e a regra dos bloqueios é: allow update: if false.
+  A gravação é feita em conjunto, por isso a reserva também é recusada.
+  Uma reserva sem os seus bloqueios é igualmente recusada (getAfter).
+end note
+
+note over A, B
+  Num equipamento com várias unidades, o utilizador B volta a escolher
+  o horário e fica com a unidade seguinte (ID terminado em _unit_2).
+end note
+@enduml
