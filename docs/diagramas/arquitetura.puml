@@ -5,7 +5,7 @@ title CampusReserva: arquitetura da solução (BaaS)
 skinparam monochrome true
 skinparam shadowing false
 skinparam componentStyle rectangle
-left to right direction
+
 
 actor "Utilizador\nou gestor" as pessoa
 actor "Equipa de\ndesenvolvimento" as equipa
