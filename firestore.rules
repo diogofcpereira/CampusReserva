@@ -22,6 +22,30 @@ service cloud.firestore {
       ];
     }
 
+    // Quem cancelou e porquê (campos opcionais, para o histórico):
+    // - cancelledBy tem de ser a própria pessoa autenticada;
+    // - 'utilizador' só pelo dono da reserva; 'gestor' só por um gestor;
+    // - 'recurso_desativado' só por um gestor e só se, no fim da operação,
+    //   o recurso estiver mesmo desativado.
+    function validCancellation(before, after) {
+      return after.get('cancelledBy', request.auth.uid) == request.auth.uid
+        && (
+          after.get('cancelReason', null) == null
+          || (after.cancelReason == 'utilizador' && before.userId == request.auth.uid)
+          || (after.cancelReason == 'gestor' && isManager())
+          || (after.cancelReason == 'recurso_desativado'
+              && isManager()
+              && getAfter(/databases/$(database)/documents/resources/$(before.resourceId)).data.active == false)
+        );
+    }
+
+    // Dia de hoje ou futuro (em UTC). Impede reservas em dias que já passaram,
+    // mesmo que alguém contorne a interface.
+    function notPastDate(value) {
+      return timestamp.date(int(value.split('-')[0]), int(value.split('-')[1]), int(value.split('-')[2]))
+        + duration.value(1, 'd') > request.time;
+    }
+
     // Exige uma data real no formato AAAA-MM-DD e rejeita texto livre.
     function validDate(value) {
       return value is string
@@ -238,6 +262,7 @@ service cloud.firestore {
         && request.resource.data.status == 'ativa'
         && request.resource.data.resourceId is string
         && validDate(request.resource.data.date)
+        && notPastDate(request.resource.data.date)
         && validStartTime(request.resource.data.startTime)
         && validDuration(request.resource.data.durationMinutes)
         && request.resource.data.endTime == endTimeFor(request.resource.data.startTime, request.resource.data.durationMinutes)
@@ -256,12 +281,15 @@ service cloud.firestore {
         && reservationLocksMatch(request.resource.data, reservationId)
         && request.resource.data.keys().hasOnly(['userId', 'resourceId', 'resourceName', 'resourceType', 'date', 'startTime', 'endTime', 'durationMinutes', 'unitNumber', 'slotId', 'slotIds', 'status', 'createdAt']);
 
-      // Cancelar só altera estado/data e elimina todos os bloqueios na mesma transação.
+      // Cancelar só altera estado/data (e, opcionalmente, quem cancelou e porquê)
+      // e elimina todos os bloqueios na mesma transação.
       allow update: if signedIn()
         && (resource.data.userId == request.auth.uid || isManager())
         && resource.data.status == 'ativa'
         && request.resource.data.status == 'cancelada'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt', 'cancelledBy', 'cancelReason'])
+        && request.resource.data.cancelledAt == request.time
+        && validCancellation(resource.data, request.resource.data)
         && reservationLocksRemoved(resource.data);
 
       allow delete: if false;
