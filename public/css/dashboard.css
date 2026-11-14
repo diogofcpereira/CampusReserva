@@ -43,7 +43,7 @@ button:disabled { cursor: not-allowed; opacity: .52; transform: none !important;
 .icon-button { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 20px; }
 .icon-button:hover { background: var(--brand-soft); color: var(--brand); }
 .main-content { display: flex; flex-direction: column; min-height: 100vh; margin-left: 264px; padding: 0 35px; }
-.topbar { display: flex; align-items: center; gap: 16px; min-height: 100px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.85); }
+.topbar { display: flex; align-items: center; gap: 16px; min-height: 100px; margin-top: 20px; padding: 20px 24px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
 .topbar-heading { min-width: 0; flex: 1; }
 .topbar-heading > p:first-child { margin: 0 0 7px; color: var(--muted); font-size: 11px; }
 .topbar-heading > p:first-child span { padding: 0 6px; color: #c7cbd3; }
@@ -395,5 +395,45 @@ button:disabled { cursor: not-allowed; opacity: .52; transform: none !important;
 @media (max-width: 650px) {
   .deactivate-resource-summary .cancel-detail span {
     flex-basis: 150px;
+  }
+}
+
+/* Uniformização do cabeçalho da dashboard */
+.topbar-heading {
+  min-width: 0;
+  flex: 1;
+}
+
+.topbar-heading h1 {
+  margin: 0 0 5px;
+  color: var(--ink);
+  font-size: 25px;
+  letter-spacing: -.8px;
+}
+
+.topbar-badges {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Adaptação a ecrãs pequenos */
+@media (max-width: 650px) {
+  .topbar {
+    min-height: 85px;
+    margin-top: 12px;
+    padding: 14px;
+    border-radius: 13px;
+    gap: 10px;
+  }
+
+  .topbar-heading h1 {
+    font-size: 19px;
+  }
+
+  .topbar-badges {
+    gap: 5px;
   }
 }
