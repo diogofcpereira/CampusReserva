@@ -180,5 +180,15 @@
       <div class="cancel-reservation-actions"><button class="button button-secondary" type="button" id="keepReservationBtn">Manter reserva</button><button class="button button-danger" type="button" id="confirmCancelReservationBtn">Cancelar reserva</button></div>
     </div>
   </dialog>
+
+    <dialog class="resource-dialog cancel-reservation-dialog" id="deactivateResourceDialog" aria-labelledby="deactivateResourceTitle">
+    <div class="dialog-header"><div><span class="eyebrow">GESTÃO DE RECURSOS</span><h2 id="deactivateResourceTitle">Desativar recurso?</h2><p id="deactivateResourceIntro">Este recurso tem reservas por realizar.</p></div><button class="dialog-close" type="button" id="closeDeactivateResourceDialog" aria-label="Fechar">×</button></div>
+    <div class="dialog-content">
+      <div id="deactivateResourceSummary" class="cancel-reservation-summary deactivate-resource-summary"></div>
+      <p class="dialog-footnote">Ao desativar, estas reservas são canceladas e os horários ficam livres. Cada utilizador vê a reserva como “Cancelada pelo gestor: o recurso foi desativado”. O recurso deixa de aceitar reservas até ser reativado.</p>
+      <p class="dialog-error" id="deactivateResourceError" role="alert" hidden></p>
+      <div class="cancel-reservation-actions"><button class="button button-secondary" type="button" id="keepResourceActiveBtn">Manter ativo</button><button class="button button-danger" type="button" id="confirmDeactivateResourceBtn">Desativar e cancelar reservas</button></div>
+    </div>
+  </dialog>
 </body>
 </html>

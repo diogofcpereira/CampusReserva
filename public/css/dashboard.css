@@ -380,3 +380,20 @@ button:disabled { cursor: not-allowed; opacity: .52; transform: none !important;
     width: 100%;
   }
 }
+
+/* Desativar recurso: lista das reservas que vão ser canceladas. */
+.deactivate-resource-summary {
+  max-height: min(320px, 45vh);
+  overflow-y: auto;
+}
+
+.deactivate-resource-summary .cancel-detail span {
+  flex-basis: 190px;
+  font-size: 12px;
+}
+
+@media (max-width: 650px) {
+  .deactivate-resource-summary .cancel-detail span {
+    flex-basis: 150px;
+  }
+}

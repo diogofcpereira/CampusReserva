@@ -117,13 +117,23 @@ function configureRoleUI() {
   $("#managerHome").hidden = !isManager;
 }
 
+const MANAGER_HISTORY_DAYS = 30;
+
+function daysFromToday(days) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
 async function loadData() {
   const isManager = currentProfile?.role === "gestor";
   const resourcesQuery = isManager
     ? collection(db, "resources")
     : query(collection(db, "resources"), where("active", "==", true));
+  // R7: o painel do gestor lia TODAS as reservas de sempre em cada abertura, um custo que cresce
+  // sem limite. Agora lê só os últimos MANAGER_HISTORY_DAYS dias e as reservas futuras.
   const reservationsQuery = isManager
-    ? collection(db, "reservations")
+    ? query(collection(db, "reservations"), where("date", ">=", localDateString(daysFromToday(-MANAGER_HISTORY_DAYS))))
     : query(collection(db, "reservations"), where("userId", "==", currentUser.uid));
   const todayLocksQuery = query(
     collection(db, "reservationSlots"),
@@ -297,9 +307,13 @@ function createReservationRow(reservation, managerMode) {
   const canCancel = !cancelled && (managerMode || getSlotDate(reservation) >= new Date());
   const unitText = reservation.resourceType === "equipamento"
     ? ` · Unidade ${Number(reservation.unitNumber || 1)}` : "";
+  const cancelNote = !cancelled ? ""
+    : reservation.cancelReason === "recurso_desativado" ? "Cancelada pelo gestor: o recurso foi desativado"
+    : reservation.cancelReason === "gestor" ? "Cancelada pelo gestor"
+    : "";
   row.innerHTML = `
     <div class="date-tile"><strong>${date ? date.getDate() : "—"}</strong><small>${date ? date.toLocaleDateString("pt-PT", { month: "short" }) : "—"}</small></div>
-    <div class="reservation-details"><h3>${escapeHtml(reservation.resourceName || findResourceName(reservation.resourceId))}</h3><p>${escapeHtml(reservation.date || "Data por definir")} · ${escapeHtml(reservation.startTime || "—")}–${escapeHtml(getReservationEndTime(reservation))} (${escapeHtml(formatDuration(getReservationDuration(reservation)))})${escapeHtml(unitText)}<br>${reservation.resourceType === "sala" ? "Sala" : "Equipamento"}${managerMode ? `<br><span class="reservation-owner">Reservado por: ${escapeHtml(owner)}</span>` : ""}</p></div>
+    <div class="reservation-details"><h3>${escapeHtml(reservation.resourceName || findResourceName(reservation.resourceId))}</h3><p>${escapeHtml(reservation.date || "Data por definir")} · ${escapeHtml(reservation.startTime || "—")}–${escapeHtml(getReservationEndTime(reservation))} (${escapeHtml(formatDuration(getReservationDuration(reservation)))})${escapeHtml(unitText)}<br>${reservation.resourceType === "sala" ? "Sala" : "Equipamento"}${managerMode ? `<br><span class="reservation-owner">Reservado por: ${escapeHtml(owner)}</span>` : ""}${cancelNote ? `<br><span class="reservation-owner">${escapeHtml(cancelNote)}</span>` : ""}</p></div>
     <div class="reservation-actions"><span class="status-pill ${cancelled ? "cancelled" : ""}">${cancelled ? "Cancelada" : "Ativa"}</span>${canCancel ? `<button class="cancel-button" type="button" data-cancel-id="${escapeHtml(reservation.id)}">Cancelar</button>` : ""}</div>`;
   return row;
 }
@@ -826,7 +840,9 @@ async function cancelPendingReservation() {
 
       transaction.update(reservationRef, {
         status: "cancelada",
-        cancelledAt: serverTimestamp()
+        cancelledAt: serverTimestamp(),
+        cancelledBy: currentUser.uid,
+        cancelReason: currentReservation.userId === currentUser.uid ? "utilizador" : "gestor"
       });
 
       lockSnapshots.forEach((snapshot, index) => {
@@ -836,8 +852,8 @@ async function cancelPendingReservation() {
 
     pendingCancellation = null;
     $("#cancelReservationDialog").close();
-    showNotice("Reserva cancelada. Os horários e a unidade voltaram a ficar disponíveis.");
     await loadData();
+    showNotice("Reserva cancelada. Os horários e a unidade voltaram a ficar disponíveis.");
     if ($("#resourceDialog").open) await refreshDialogSlots();
   } catch (error) {
     console.error("Erro ao cancelar reserva:", error);
@@ -952,13 +968,27 @@ $("#managerResourceList").addEventListener("click", async event => {
     const resource = resources.find(item => item.id === toggleButton.dataset.toggleResource);
     if (!resource) return;
     toggleButton.disabled = true;
+
+    // Desativar: primeiro verificar se há reservas por realizar (feedback de 28 out).
+    if (resource.active === true) {
+      try {
+        await startResourceDeactivation(resource);
+      } catch (error) {
+        console.error("Erro ao preparar a desativação:", error);
+        showNotice("Não foi possível consultar as reservas deste recurso. Tenta novamente.", true);
+      } finally {
+        toggleButton.disabled = false;
+      }
+      return;
+    }
+
     try {
       await updateDoc(doc(db, "resources", resource.id), {
-        active: resource.active !== true,
+        active: true,
         updatedAt: serverTimestamp()
       });
-      showNotice(resource.active ? "Recurso desativado. As reservas antigas foram preservadas." : "Recurso reativado.");
       await loadData();
+      showNotice("Recurso reativado.");
     } catch (error) {
       console.error("Erro ao alterar estado do recurso:", error);
       showNotice("Não foi possível alterar o estado do recurso.", true);
@@ -966,6 +996,183 @@ $("#managerResourceList").addEventListener("click", async event => {
     }
   }
 });
+
+// ---------------------- Desativar recurso com reservas futuras ----------------------
+// Decisão do grupo (feedback de 28 out): ao desativar um recurso, as reservas que ainda
+// não terminaram são canceladas e os horários ficam livres. Sem Cloud Functions no plano
+// Spark, é o browser do gestor que faz o cancelamento, dentro de transações.
+
+// As Security Rules aceitam no máximo 20 acessos a documentos por operação (get/exists/getAfter).
+// Cada reserva cancelada usa 1 + número de bloqueios; o perfil do gestor e o recurso somam 2.
+// Com 16 por lote fica margem. O emulador não aplica este limite: só o Firestore real.
+const MAX_DOCS_PER_DEACTIVATION_BATCH = 16;
+let pendingDeactivation = null;
+
+function reservationSlotIdsOf(reservation) {
+  return Array.isArray(reservation.slotIds) && reservation.slotIds.length
+    ? reservation.slotIds
+    : [reservation.slotId || makeSlotId(reservation.resourceId, reservation.date, reservation.startTime)];
+}
+
+function getReservationEndDate(reservation) {
+  const date = parseLocalDate(reservation.date);
+  if (!date) return new Date(0);
+  const [hours, minutes] = getReservationEndTime(reservation).split(":").map(Number);
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+}
+
+async function getUpcomingReservationsOf(resourceId) {
+  const snapshot = await getDocs(query(
+    collection(db, "reservations"),
+    where("resourceId", "==", resourceId),
+    where("status", "==", "ativa")
+  ));
+  const now = new Date();
+  return snapshot.docs
+    .map(item => ({ id: item.id, ...item.data() }))
+    .filter(reservation => getReservationEndDate(reservation) > now)
+    .sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`));
+}
+
+// Divide as reservas em lotes que respeitam o limite de acessos das Security Rules.
+// Uma reserva e os seus bloqueios ficam sempre no mesmo lote.
+function splitIntoDeactivationBatches(reservationsToCancel) {
+  const batches = [];
+  let current = [];
+  let used = 0;
+  for (const reservation of reservationsToCancel) {
+    const cost = 1 + reservationSlotIdsOf(reservation).length;
+    if (current.length && used + cost > MAX_DOCS_PER_DEACTIVATION_BATCH) {
+      batches.push(current);
+      current = [];
+      used = 0;
+    }
+    current.push(reservation);
+    used += cost;
+  }
+  if (current.length) batches.push(current);
+  return batches;
+}
+
+async function startResourceDeactivation(resource) {
+  const upcoming = await getUpcomingReservationsOf(resource.id);
+
+  if (!upcoming.length) {
+    await updateDoc(doc(db, "resources", resource.id), { active: false, updatedAt: serverTimestamp() });
+    await loadData();
+    showNotice("Recurso desativado. Não tinha reservas por realizar.");
+    return;
+  }
+
+  pendingDeactivation = { resource, reservations: upcoming };
+  const total = upcoming.length;
+  const summary = $("#deactivateResourceSummary");
+  summary.replaceChildren(...upcoming.map(reservation => {
+    const row = document.createElement("div");
+    row.className = "cancel-detail";
+    const when = document.createElement("span");
+    when.textContent = `${reservation.date} · ${reservation.startTime}–${getReservationEndTime(reservation)}`;
+    const who = document.createElement("strong");
+    const unit = reservation.resourceType === "equipamento" ? ` · Unidade ${Number(reservation.unitNumber || 1)}` : "";
+    who.textContent = `${getProfileLabel(reservation.userId)}${unit}`;
+    row.append(when, who);
+    return row;
+  }));
+  $("#deactivateResourceTitle").textContent = `Desativar ${resource.name || "recurso"}?`;
+  $("#deactivateResourceIntro").textContent = total === 1
+    ? "Há 1 reserva por realizar neste recurso."
+    : `Há ${total} reservas por realizar neste recurso.`;
+  $("#deactivateResourceError").hidden = true;
+  const confirmButton = $("#confirmDeactivateResourceBtn");
+  confirmButton.disabled = false;
+  confirmButton.textContent = total === 1 ? "Desativar e cancelar 1 reserva" : `Desativar e cancelar ${total} reservas`;
+  $("#deactivateResourceDialog").showModal();
+}
+
+async function confirmResourceDeactivation() {
+  if (!pendingDeactivation) return;
+  const { resource, reservations: toCancel } = pendingDeactivation;
+  const confirmButton = $("#confirmDeactivateResourceBtn");
+  const errorBox = $("#deactivateResourceError");
+  confirmButton.disabled = true;
+  confirmButton.textContent = "A desativar...";
+  errorBox.hidden = true;
+
+  const batches = splitIntoDeactivationBatches(toCancel);
+  let cancelled = 0;
+  let resourceDeactivated = false;
+
+  try {
+    for (const batch of batches) {
+      let cancelledInBatch = 0;
+      await runTransaction(db, async transaction => {
+        // Numa transação, todas as leituras vêm antes das escritas.
+        const items = await Promise.all(batch.map(async reservation => {
+          const reservationRef = doc(db, "reservations", reservation.id);
+          const lockRefs = reservationSlotIdsOf(reservation).map(slotId => doc(db, "reservationSlots", slotId));
+          const reservationSnapshot = await transaction.get(reservationRef);
+          const lockSnapshots = await Promise.all(lockRefs.map(ref => transaction.get(ref)));
+          return { reservationRef, reservationSnapshot, lockRefs, lockSnapshots };
+        }));
+
+        // O recurso é desativado na primeira operação, junto com o primeiro lote:
+        // a partir daí ninguém consegue fazer novas reservas nele.
+        if (!resourceDeactivated) {
+          transaction.update(doc(db, "resources", resource.id), { active: false, updatedAt: serverTimestamp() });
+        }
+
+        cancelledInBatch = 0;
+        for (const item of items) {
+          // Pode ter sido cancelada entretanto pelo próprio utilizador.
+          if (!item.reservationSnapshot.exists() || item.reservationSnapshot.data().status !== "ativa") continue;
+          transaction.update(item.reservationRef, {
+            status: "cancelada",
+            cancelledAt: serverTimestamp(),
+            cancelledBy: currentUser.uid,
+            cancelReason: "recurso_desativado"
+          });
+          item.lockSnapshots.forEach((snapshot, index) => {
+            if (snapshot.exists()) transaction.delete(item.lockRefs[index]);
+          });
+          cancelledInBatch++;
+        }
+      });
+      resourceDeactivated = true;
+      cancelled += cancelledInBatch;
+    }
+
+    pendingDeactivation = null;
+    $("#deactivateResourceDialog").close();
+    await loadData();
+    showNotice(cancelled === 1
+      ? "Recurso desativado. 1 reserva foi cancelada e o horário ficou livre."
+      : `Recurso desativado. ${cancelled} reservas foram canceladas e os horários ficaram livres.`);
+  } catch (error) {
+    console.error("Erro ao desativar o recurso:", error);
+    confirmButton.disabled = false;
+    confirmButton.textContent = "Tentar novamente";
+    errorBox.textContent = resourceDeactivated
+      ? `O recurso foi desativado, mas só ${cancelled} de ${toCancel.length} reservas foram canceladas. Tenta novamente ou cancela as restantes em Gerir reservas.`
+      : (error.code === "permission-denied"
+        ? "As regras do Firestore recusaram a operação. Confirma que continuas a ser gestor."
+        : "Não foi possível desativar o recurso. Nada foi alterado; tenta novamente.");
+    errorBox.hidden = false;
+    if (resourceDeactivated) {
+      // Voltar a tentar só com as reservas que ficaram por cancelar.
+      await loadData();
+      pendingDeactivation = { resource, reservations: await getUpcomingReservationsOf(resource.id) };
+    }
+  }
+}
+
+$("#confirmDeactivateResourceBtn").addEventListener("click", confirmResourceDeactivation);
+$("#keepResourceActiveBtn").addEventListener("click", () => $("#deactivateResourceDialog").close());
+$("#closeDeactivateResourceDialog").addEventListener("click", () => $("#deactivateResourceDialog").close());
+$("#deactivateResourceDialog").addEventListener("click", event => {
+  if (event.target === $("#deactivateResourceDialog")) $("#deactivateResourceDialog").close();
+});
+$("#deactivateResourceDialog").addEventListener("close", () => { pendingDeactivation = null; });
 
 function renderManagerResources() {
   const list = $("#managerResourceList");
