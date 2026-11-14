@@ -12,7 +12,7 @@ participant "Cloud Firestore\ne Security Rules" as F
 actor "Pedido direto à API\nsem usar a aplicação" as X
 
 note over A, B
-  Ambos veem a sala livre às 10:00 e confirmam quase ao mesmo tempo.
+  Ambos veem a sala livre às 10:00 e confirmam ao mesmo tempo.
   O bloqueio desse horário tem sempre o mesmo ID:
   sala1_2026-11-20_10:00
 end note
@@ -35,7 +35,7 @@ B -> F : Grava a reserva B e o mesmo bloqueio
 F --> B : Rejeitado: o bloqueio lido mudou entretanto
 B -> F : O SDK repete a transação B\ne volta a ler o bloqueio
 F --> B : Já existe
-B -> B : dashboard.js interrompe a transação\ncom o erro SLOT_ALREADY_BOOKED
+B -> B : Interrompida a transação\ncom o erro SLOT_ALREADY_BOOKED
 
 note over B
   Nada é gravado. O utilizador B lê a mensagem
@@ -47,13 +47,6 @@ end note
 
 X -> F : Tenta gravar uma reserva e escrever\npor cima do bloqueio que já existe
 F --> X : permission-denied
-
-note over F, X
-  Escrever sobre um documento que já existe é uma atualização,
-  e a regra dos bloqueios é: allow update: if false.
-  A gravação é feita em conjunto, por isso a reserva também é recusada.
-  Uma reserva sem os seus bloqueios é igualmente recusada (getAfter).
-end note
 
 note over A, B
   Num equipamento com várias unidades, o utilizador B volta a escolher
