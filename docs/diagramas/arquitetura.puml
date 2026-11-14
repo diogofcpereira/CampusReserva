@@ -1,6 +1,6 @@
 @startuml arquitetura
 
-title CampusReserva: arquitetura da solução (BaaS, sem servidor próprio)
+title CampusReserva: arquitetura da solução (BaaS)
 
 skinparam monochrome true
 skinparam shadowing false
@@ -11,11 +11,11 @@ actor "Utilizador\nou gestor" as pessoa
 actor "Equipa de\ndesenvolvimento" as equipa
 
 node "Browser" as browser {
-  component "Aplicação web\nHTML, CSS e JavaScript\nSDK Firebase 10.4.0 por CDN" as app
+  component "Aplicação web" as app
 }
 
-cloud "Firebase: projeto campusreservage, plano Spark" as firebase {
-  component "Firebase Hosting\nserve a pasta public/\ncanal live: campusreservage.web.app\ncanais de pré-visualização dos PR" as hosting
+cloud "Firebase" as firebase {
+  component "Firebase Hosting\ncampusreservage.web.app" as hosting
   component "Firebase Authentication\nemail e palavra-passe" as auth
   component "Security Rules\nfirestore.rules" as rules
   database "Cloud Firestore\nusers, resources,\nreservations, reservationSlots" as db
@@ -33,19 +33,9 @@ app --> rules : 3. Lê e escreve dados\ncom o token da sessão
 auth ..> rules : identidade de quem pede\n(request.auth)
 rules --> db : só passa o que\nas regras permitem
 
-equipa --> repo : push para main\nou pull request
+equipa --> repo : push para main
 repo --> actions : dispara o workflow
-actions --> rules : push para main: publica as regras\ndepois de os testes passarem
-actions --> hosting : push para main: canal live\npull request: canal de pré-visualização
+actions --> rules : publica as regras\ndepois de os testes passarem
+actions --> hosting : publica a aplicação\ndepois das regras
 
-note bottom of hosting
-  Uma pré-visualização corre fora de localhost, por isso
-  usa a Authentication e o Firestore de produção,
-  com as regras que já estão publicadas.
-end note
-
-legend
-  Não existe servidor próprio: a lógica corre no browser
-  e a segurança é imposta pelas Security Rules.
-endlegend
 @enduml
