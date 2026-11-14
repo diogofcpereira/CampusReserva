@@ -3,4 +3,7 @@ node_modules/
 # Firebase Emulator logs
 *.log
 # Dados dos emuladores (contas e documentos de teste)
-dados-emulador/
+dados-emulador/capturas/
+capturas/
+
+capturas/
