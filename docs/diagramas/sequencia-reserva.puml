@@ -11,25 +11,20 @@ participant "Browser\n(dashboard.js)" as B
 participant "Security Rules\n(firestore.rules)" as R
 database "Cloud Firestore" as F
 
-note over R
-  Todos os pedidos passam pelas regras, leituras incluídas.
-  O diagrama detalha apenas a validação da escrita.
-end note
-
-U -> B : Abre um recurso (o dia de hoje vem escolhido)\ne pode mudar de dia
-B -> F : Lê os bloqueios (reservationSlots)\ndesse recurso nesse dia
+U -> B : Abre um recurso
+B -> F : Lê os bloqueios (reservationSlots)\ndesse recurso no dia escolhido
 F --> B : Bloqueios existentes
-B --> U : Grelha de meias horas das 08:00 às 21:30:\nlivres, ocupadas e passadas, mais o limite 22:00
-U -> B : Clica na hora de início (30 minutos por defeito)\ne, se quiser, numa hora de fim (até 3 horas)
-B -> B : Confirma que todo o intervalo tem\numa unidade livre
+B --> U : Grelha de meias horas das 08:00 às 21:30
+U -> B : Seleciona a hora de início\n(e hora de fim se for >30 minutos)
+B -> B : Confirma que o intervalo tem\numa unidade livre
 U -> B : Confirma
-B -> B : Valida o intervalo:\ndia e hora ainda não passaram, 30 a 180 minutos, até às 22:00
+B -> B : Valida o intervalo
 B -> F : Volta a ler os bloqueios desse dia
 F --> B : Bloqueios atuais
-B -> B : Escolhe a primeira unidade livre em todo o intervalo\n(uma sala tem sempre uma só unidade)\ne calcula o ID de cada bloqueio
+B -> B : Escolhe a primeira unidade livre em todo o intervalo\ncalcula o ID de cada bloqueio
 
 group Transação (runTransaction)
-  B -> F : Lê o recurso e cada bloqueio do intervalo\n(num equipamento, unidade 1, também os IDs antigos sem _unit_n)
+  B -> F : Lê o recurso e cada bloqueio do intervalo
   F --> B : Recurso e bloqueios
 
   alt O recurso não existe ou está desativado
@@ -42,25 +37,13 @@ group Transação (runTransaction)
     B -> B : Interrompe com RESOURCE_CAPACITY_CHANGED
     B --> U : "O recurso foi alterado ou desativado pelo gestor"
   else Tudo livre
-    B -> R : Pede a gravação em conjunto (commit):\n1 reserva com status "ativa"\ne 1 bloqueio por cada meia hora
-
-    note over R
-      Reserva: pertence a quem pede; data real e de hoje
-      ou futura (em UTC; a hora não é verificada);
-      hora de início e duração válidas, endTime coerente;
-      o recurso existe, está ativo, e o nome e o tipo coincidem;
-      a unidade existe; N meias horas têm exatamente N bloqueios
-      que apontam para a reserva (getAfter).
-      Bloqueio: tem o ID determinístico; aponta para uma reserva
-      ativa de quem pede (getAfter); está dentro do intervalo;
-      nunca pode ser atualizado.
-    end note
+    B -> R : Pede a gravação em conjunto:\n1 reserva com status "ativa"\ne 1 bloqueio por cada meia hora
 
     alt Todas as escritas cumprem as regras
       R -> F : Grava a reserva e os bloqueios
       F --> B : Confirmado
-      B --> U : Aviso "Reserva criada",\ncom a unidade se for um equipamento
-      B -> F : Recarrega os dados do painel (loadData)
+      B --> U : Aviso "Reserva criada"
+      B -> F : Recarrega os dados do painel
     else Uma das escritas é recusada
       R --> B : permission-denied, nada é gravado
       B --> U : Mensagem de erro
