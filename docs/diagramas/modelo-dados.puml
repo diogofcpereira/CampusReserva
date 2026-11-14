@@ -37,22 +37,21 @@ class "reservations" as Reservation <<coleção>> {
   --
   userId : string
   resourceId : string
-  resourceName : string, cópia do nome do recurso
-  resourceType : "sala" ou "equipamento"
-  date : string AAAA-MM-DD, hoje ou futura (UTC) ao criar
-  startTime : string HH:MM, de 08:00 a 21:30
-  endTime : string HH:MM, até 22:00
-  durationMinutes : 30, 60, 90, 120, 150 ou 180
-  unitNumber : inteiro, sempre 1 nas salas
-  slotId : string, igual ao primeiro de slotIds
-  slotIds : lista de 1 a 6 IDs de bloqueios
-  status : "ativa" ou "cancelada"
+  resourceName : string
+  resourceType : string
+  date : string
+  startTime : string
+  endTime : string
+  durationMinutes : int
+  unitNumber : int
+  slotId : string
+  slotIds : lista de string
+  status : string
   createdAt : timestamp
   .. só depois de cancelada ..
   cancelledAt : timestamp
   cancelledBy : string
   cancelReason : string
-  ou "recurso_desativado"
 }
 
 class "reservationSlots" as Slot <<coleção>> {
@@ -66,7 +65,7 @@ class "reservationSlots" as Slot <<coleção>> {
 }
 
 User "1" -- "0..*" Reservation : userId
-User "1" -- "0..*" Reservation : cancelledBy
+User "0..1" -- "0..*" Reservation : cancelledBy
 Resource "1" -- "0..*" Reservation : resourceId
 Reservation "1" *-- "0..6" Slot : slotIds e reservationId
 Resource "1" -- "0..*" Slot : resourceId
