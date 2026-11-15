@@ -17,7 +17,6 @@ package "Ambiente de Desenvolvimento" as dev {
   }
 
   folder "dados-emulador/\nfora do repositório (.gitignore)" as dados
-  component "npm run test:regras\nemulador temporário do Firestore\nprojeto demo-campusreserva" as testes
   component "Código local" as codigo
 }
 
@@ -26,7 +25,7 @@ component "GitHub Actions" as ci
 package "Produção: projeto Firebase campusreservage" as prod {
   component "Browser\ncampusreservage.web.app" as bprod
   component "Firebase Hosting\ncanal live" as phost
-  component "Firebase Hosting" as pprev
+  component "Firebase Hosting\ncanal de pré-visualização\ndos pull requests" as pprev
   component "Firebase Authentication" as pauth
   database "Cloud Firestore\ncom as regras publicadas" as pfs
 }
@@ -36,18 +35,19 @@ bdev --> eauth : contas de teste
 bdev --> efs : dados de teste
 eui ..> eauth : ver e editar contas
 eui ..> efs : ver e editar documentos
-eauth ..> dados : npm run
-efs ..> dados : npm run
+eauth ..> dados : exporta ao parar
+efs ..> dados : exporta ao parar
 
 bprod --> phost : carrega a aplicação
-bprod --> pauth : contas produção
-bprod --> pfs : dados produção
-pprev ..> pauth : contas produção
-pprev ..> pfs : dados produção
+bprod --> pauth : contas de produção
+bprod --> pfs : dados de produção
+pprev ..> pauth : contas de produção
+pprev ..> pfs : dados de produção
 
 codigo --> ci : git push ou pull request
 ci --> pfs : publica as regras
 ci --> phost : publica a pasta public/
 ci --> pprev : publica a pasta public/
+
 
 @enduml

@@ -20,13 +20,6 @@ B -> A : createUserWithEmailAndPassword
 A --> B : Conta criada, com UID, e sessão iniciada
 B -> R : Cria o perfil no documento users/UID\ncom role "utilizador"
 
-note over R
-  O ID do documento é o UID de quem pede;
-  o email é o da conta;
-  role só pode ser "utilizador";
-  só os campos previstos.
-end note
-
 alt O perfil cumpre as regras
   R -> F : Grava o perfil
   F --> B : Confirmado
@@ -62,13 +55,6 @@ else Outro erro (por exemplo, email inválido)
   B --> P : Mensagem de erro
 end
 
-note over B, A
-  Nos emuladores não sai nenhum email:
-  a ligação aparece no terminal dos emuladores.
-  A palavra-passe muda só na Authentication;
-  o Firestore não é tocado.
-end note
-
 == Entrar no painel (dashboard.js) ==
 
 B -> A : Há sessão? (onAuthStateChanged)
@@ -87,9 +73,4 @@ else Com sessão
   F --> B : Utilizador: recursos ativos e as suas reservas\nGestor: todos os recursos, perfis e as reservas\ndos últimos 30 dias e futuras\nAmbos: bloqueios de hoje
 end
 
-note over R, F
-  Esconder o menu de gestão é só interface. Nos pedidos de gestão,
-  as regras voltam a ler users/UID para confirmar o papel (isManager).
-  Uma conta sem perfil é tratada como utilizador.
-end note
 @enduml

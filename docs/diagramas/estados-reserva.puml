@@ -16,22 +16,9 @@ ativa : 1 a 6 bloqueios em reservationSlots
 cancelada : sem bloqueios
 cancelada : guarda cancelledAt, cancelledBy e cancelReason
 
-[*] --> ativa : quem tem sessão reserva para si\n(userId é o seu UID), com os\nbloqueios na mesma transação
+[*] --> ativa : Efetuar reserva
 ativa --> cancelada : o dono cancela\ncancelReason "utilizador"
 ativa --> cancelada : um gestor cancela\ncancelReason "gestor"
 ativa --> cancelada : um gestor desativa o recurso\ncancelReason "recurso_desativado"
-
-note right of ativa
-  Cancelar apaga todos os bloqueios na mesma
-  operação, e o horário volta a ficar livre.
-  Uma reserva que já terminou continua "ativa":
-  não existe um estado de reserva concluída.
-end note
-
-note right of cancelada
-  Estado final: as regras não deixam voltar a "ativa"
-  nem alterar a reserva, e ninguém a apaga.
-  cancelledBy é sempre o UID de quem cancelou.
-end note
 
 @enduml
