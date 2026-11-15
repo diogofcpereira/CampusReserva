@@ -61,10 +61,10 @@ class "reservationSlots" as Slot <<coleção>> {
   resourceId : string
   date : string
   startTime : string
-  unitNumber : inteiro
+  unitNumber : int
 }
 
-User "1" -- "0..*" Reservation : userId
+User "0..1" -- "0..*" Reservation : userId
 User "0..1" -- "0..*" Reservation : cancelledBy
 Resource "1" -- "0..*" Reservation : resourceId
 Reservation "1" *-- "0..6" Slot : slotIds e reservationId

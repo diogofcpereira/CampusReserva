@@ -1,0 +1,58 @@
+@startuml sequencia-cancelamento
+' Capítulo 7: Autenticação e regras de segurança.
+' Fontes: public/js/dashboard.js (createReservationRow, handleCancelClick, cancelPendingReservation)
+' e firestore.rules (allow update de reservations, allow delete de reservationSlots).
+
+title CampusReserva: cancelar uma reserva
+
+skinparam monochrome true
+skinparam shadowing false
+autonumber
+
+actor "Utilizador\nou gestor" as U
+participant "Browser\n(dashboard.js)" as B
+participant "Security Rules\n(firestore.rules)" as R
+database "Cloud Firestore" as F
+
+note over U, B
+  O botão "Cancelar" só aparece numa reserva ativa.
+  Ao utilizador, só nas suas que ainda não começaram;
+  ao gestor, em qualquer uma de "Gerir reservas".
+end note
+
+U -> B : Clica em "Cancelar"
+B --> U : Janela com os detalhes da reserva
+U -> B : "Cancelar reserva"
+
+group Transação (runTransaction)
+  B -> F : Lê a reserva e os seus bloqueios
+  F --> B : Estado atual
+
+  alt Já não existe, já está cancelada,\nou quem pede não é o dono nem gestor
+    B -> B : Interrompe a transação
+    B --> U : "Não foi possível cancelar a reserva"
+  else A reserva continua ativa
+    B -> R : Grava em conjunto:\nstatus "cancelada", cancelledAt, cancelledBy (o seu UID),\ncancelReason "utilizador" (dono) ou "gestor";\napaga os bloqueios que existem
+
+    note over R
+      Reserva: só o dono ou um gestor; de "ativa" para "cancelada";
+      só mudam status, cancelledAt (hora do servidor),
+      cancelledBy (quem pede) e cancelReason;
+      todos os bloqueios deixam de existir (existsAfter).
+      Bloqueio: só se apaga se a reserva ficar cancelada (getAfter).
+      A data não é verificada: o limite "ainda não começou"
+      do utilizador existe só na interface.
+    end note
+
+    alt Todas as escritas cumprem as regras
+      R -> F : Grava a reserva e apaga os bloqueios
+      F --> B : Confirmado
+      B -> F : Recarrega os dados do painel (loadData)
+      B --> U : "Reserva cancelada. Os horários e a unidade\nvoltaram a ficar disponíveis."
+    else Uma das escritas é recusada
+      R --> B : permission-denied, nada é gravado
+      B --> U : "Não tens permissão para cancelar esta reserva"
+    end
+  end
+end
+@enduml

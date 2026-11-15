@@ -13,6 +13,7 @@ actor "Gestor" as G
 rectangle "CampusReserva" {
   usecase "Criar conta" as UC1
   usecase "Iniciar sessão" as UC2
+  usecase "Recuperar a palavra-passe" as UC12
   usecase "Consultar recursos ativos\ne a sua disponibilidade" as UC3
   usecase "Reservar sala ou equipamentos" as UC4
   usecase "Consultar as próprias reservas" as UC5
@@ -26,6 +27,7 @@ rectangle "CampusReserva" {
 
 V --> UC1
 V --> UC2
+V --> UC12
 
 U --> UC3
 U --> UC4

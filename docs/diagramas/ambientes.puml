@@ -6,27 +6,27 @@ skinparam monochrome true
 skinparam shadowing false
 skinparam componentStyle rectangle
 
-package "Desenvolvimento: computador de cada elemento" as dev {
+package "Ambiente de Desenvolvimento" as dev {
   component "Browser\nlocalhost:5000" as bdev
 
-  node "Firebase Emulator Suite: npm run emuladores,\nnpm run emuladores:continuar, ou Docker" as emu {
-    component "Emulador do Hosting\nporta 5000\nserve a pasta public/" as ehost
+  node "Firebase Emulator Suite" as emu {
+    component "Emulador do Hosting\nporta 5000" as ehost
     component "Emulador da Authentication\nporta 9099" as eauth
-    component "Emulador do Firestore\nporta 8080\nusa o firestore.rules local" as efs
+    component "Emulador do Firestore\nporta 8080" as efs
     component "Emulator UI\nporta 4000" as eui
   }
 
   folder "dados-emulador/\nfora do repositório (.gitignore)" as dados
   component "npm run test:regras\nemulador temporário do Firestore\nprojeto demo-campusreserva" as testes
-  component "Código local\npublic/ e firestore.rules" as codigo
+  component "Código local" as codigo
 }
 
-component "GitHub Actions\npush para main: testa as regras,\npublica as regras e depois a aplicação\npull request: testa as regras e\npublica uma pré-visualização" as ci
+component "GitHub Actions" as ci
 
 package "Produção: projeto Firebase campusreservage" as prod {
   component "Browser\ncampusreservage.web.app" as bprod
   component "Firebase Hosting\ncanal live" as phost
-  component "Firebase Hosting\ncanais de pré-visualização\n(URL temporário por PR)" as pprev
+  component "Firebase Hosting" as pprev
   component "Firebase Authentication" as pauth
   database "Cloud Firestore\ncom as regras publicadas" as pfs
 }
@@ -36,41 +36,18 @@ bdev --> eauth : contas de teste
 bdev --> efs : dados de teste
 eui ..> eauth : ver e editar contas
 eui ..> efs : ver e editar documentos
-eauth ..> dados : só com npm run:\nexporta ao parar,\nimporta ao continuar
-efs ..> dados : só com npm run:\nexporta ao parar,\nimporta ao continuar
+eauth ..> dados : npm run
+efs ..> dados : npm run
 
 bprod --> phost : carrega a aplicação
-bprod --> pauth : contas reais
-bprod --> pfs : dados reais
-pprev ..> pauth : contas reais
-pprev ..> pfs : dados reais
+bprod --> pauth : contas produção
+bprod --> pfs : dados produção
+pprev ..> pauth : contas produção
+pprev ..> pfs : dados produção
 
 codigo --> ci : git push ou pull request
-ci --> pfs : publica as regras\n(só no push para main)
-ci --> phost : publica a pasta public/\n(push para main)
-ci --> pprev : publica a pasta public/\n(pull request)
+ci --> pfs : publica as regras
+ci --> phost : publica a pasta public/
+ci --> pprev : publica a pasta public/
 
-note right of bdev
-  firebase.js deteta localhost ou 127.0.0.1
-  e liga-se aos emuladores.
-end note
-
-note right of bprod
-  Em qualquer outro endereço, incluindo as
-  pré-visualizações, firebase.js usa os serviços reais.
-end note
-
-note bottom of emu
-  Docker: o docker-compose.yaml usa a imagem campusreserva-emuladores,
-  que tem de ser construída antes a partir do Dockerfile.
-  O contentor arranca os emuladores sem ~--export-on-exit nem ~--import,
-  por isso os dados de teste perdem-se quando o contentor para.
-end note
-
-legend
-  O código é o mesmo nos dois ambientes; só muda o destino dos pedidos.
-  Os dados de desenvolvimento e de produção nunca se cruzam, e a publicação
-  na produção é feita pelo pipeline. As pré-visualizações dos pull requests
-  já correm contra os dados reais e contra as regras que estão publicadas.
-endlegend
 @enduml

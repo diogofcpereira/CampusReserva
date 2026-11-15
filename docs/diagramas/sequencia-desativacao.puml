@@ -22,7 +22,7 @@ alt Não há reservas por realizar
   B --> G : "Recurso desativado. Não tinha reservas por realizar."
 else Há reservas por realizar
   B --> G : Janela com a lista das reservas a cancelar
-  G -> B : "Desativar e cancelar reservas"
+  G -> B : "Desativar e cancelar N reservas"
   B -> B : Divide as reservas em lotes de até 16 documentos\n(uma reserva fica sempre no mesmo lote que os seus bloqueios)
 
   loop Para cada lote (uma transação por lote)

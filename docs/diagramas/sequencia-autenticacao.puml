@@ -49,6 +49,26 @@ B -> A : signInWithEmailAndPassword
 A --> B : Sessão iniciada
 B --> P : Abre o painel (dashboard.html)
 
+== Recuperar a palavra-passe (index.js) ==
+
+P -> B : "Esqueceste-te da palavra-passe?" e o email
+B -> A : sendPasswordResetEmail
+alt Pedido aceite, ou email sem conta (auth/user-not-found)
+  A --> B : Sucesso, ou auth/user-not-found
+  B --> P : A mesma confirmação nos dois casos,\npara não revelar se o email tem conta
+  A --> P : Email com a ligação para definir\numa nova palavra-passe (se a conta existir)
+else Outro erro (por exemplo, email inválido)
+  A --> B : Erro
+  B --> P : Mensagem de erro
+end
+
+note over B, A
+  Nos emuladores não sai nenhum email:
+  a ligação aparece no terminal dos emuladores.
+  A palavra-passe muda só na Authentication;
+  o Firestore não é tocado.
+end note
+
 == Entrar no painel (dashboard.js) ==
 
 B -> A : Há sessão? (onAuthStateChanged)
@@ -68,7 +88,7 @@ else Com sessão
 end
 
 note over R, F
-  Esconder o menu de gestão é só interface. Em cada pedido,
+  Esconder o menu de gestão é só interface. Nos pedidos de gestão,
   as regras voltam a ler users/UID para confirmar o papel (isManager).
   Uma conta sem perfil é tratada como utilizador.
 end note

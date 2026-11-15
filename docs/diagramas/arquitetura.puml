@@ -28,7 +28,7 @@ node "GitHub" as github {
 
 pessoa --> app : usa
 app --> hosting : 1. Carrega a aplicação
-app --> auth : 2. Cria conta e inicia sessão
+app --> auth : 2. Cria conta, inicia sessão\ne recupera a palavra-passe
 app --> rules : 3. Lê e escreve dados\ncom o token da sessão
 auth ..> rules : identidade de quem pede\n(request.auth)
 rules --> db : só passa o que\nas regras permitem
