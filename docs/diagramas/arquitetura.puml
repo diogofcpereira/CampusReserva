@@ -11,31 +11,46 @@ actor "Utilizador\nou gestor" as pessoa
 actor "Equipa de\ndesenvolvimento" as equipa
 
 node "Browser" as browser {
-  component "Aplicação web" as app
+  component "Aplicação web\n(SDK do Firebase)" as app
+}
+
+cloud "www.gstatic.com" as gstatic {
+  component "SDK do Firebase\n(JavaScript 10.4.0)" as sdk
 }
 
 cloud "Firebase" as firebase {
   component "Firebase Hosting\ncampusreservage.web.app" as hosting
+  component "Canal de pré-visualização\n(URL temporário por PR)" as preview
   component "Firebase Authentication\nemail e palavra-passe" as auth
-  component "Security Rules\nfirestore.rules" as rules
-  database "Cloud Firestore\nusers, resources,\nreservations, reservationSlots" as db
+  rectangle "Cloud Firestore" as firestore {
+    component "Security Rules\nfirestore.rules" as rules
+    database "Dados\nusers, resources,\nreservations, reservationSlots" as db
+  }
 }
 
 node "GitHub" as github {
   component "Repositório\ndiogofcpereira/CampusReserva" as repo
   component "GitHub Actions" as actions
+  component "Secret\nconta de serviço do Firebase" as secret
 }
 
 pessoa --> app : usa
-app --> hosting : 1. Carrega a aplicação
-app --> auth : 2. Cria conta, inicia sessão\ne recupera a palavra-passe
-app --> rules : 3. Lê e escreve dados\ncom o token da sessão
-auth ..> rules : identidade de quem pede\n(request.auth)
+app --> hosting : 1. Carrega a aplicação\n← HTML, CSS e JS
+app --> sdk : 2. Importa o SDK\n← módulos JavaScript
+app --> auth : 3. Cria conta, inicia sessão\ne recupera a palavra-passe\n← ID token (JWT)
+app --> rules : 4. Lê e escreve dados\ncom o ID token\n← documentos ou permission-denied
+note on link
+  As regras não são um serviço à parte:
+  são avaliadas pelo Firestore em cada pedido.
+end note
+auth ..> rules : o Firestore valida o token\nemitido pela Authentication\n(request.auth)
 rules --> db : só passa o que\nas regras permitem
 
-equipa --> repo : push para main
+equipa --> repo : pull request\ne push para main
 repo --> actions : dispara o workflow
-actions --> rules : publica as regras\ndepois de os testes passarem
-actions --> hosting : publica a aplicação\ndepois das regras
+secret --> actions : autentica-se com\na conta de serviço
+actions --> preview : pull request: publica a\npré-visualização depois\nde os testes passarem
+actions --> rules : push para main: publica as\nregras depois de os testes passarem
+actions --> hosting : push para main: publica\na aplicação depois das regras
 
 @enduml
