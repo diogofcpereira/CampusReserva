@@ -4,5 +4,3 @@ node_modules/
 *.log
 # Dados dos emuladores (contas e documentos de teste)
 dados-emulador/
-# Capturas de ecrã (scripts/capturas.mjs)
-capturas/
